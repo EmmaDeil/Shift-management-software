@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { Shift } from '../types';
 
@@ -9,6 +10,7 @@ const formatDate = (iso?: string | Date) => {
 };
 
 const Schedule = () => {
+  const navigate = useNavigate();
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +35,12 @@ const Schedule = () => {
   return (
     <div>
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">Schedule</h1>
+
+      <div className="mb-4 flex gap-2">
+        <button onClick={() => navigate('/dashboard')} className="btn">← Back to Dashboard</button>
+        <button onClick={() => navigate('/swaps')} className="btn">Request Swap</button>
+        <button onClick={() => navigate('/attendance')} className="btn">Clock In/Out</button>
+      </div>
 
       <div className="card p-6">
         {loading && <p>Loading schedule...</p>}

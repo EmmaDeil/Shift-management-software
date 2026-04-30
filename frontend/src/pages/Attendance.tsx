@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { Attendance } from '../types';
 
 const AttendancePage = () => {
+  const navigate = useNavigate();
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [loading, setLoading] = useState(true);
   const [clocking, setClocking] = useState(false);
@@ -60,6 +62,12 @@ const AttendancePage = () => {
   return (
     <div>
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">Attendance</h1>
+
+      <div className="mb-4 flex gap-2">
+        <button onClick={() => navigate('/dashboard')} className="btn">← Back to Dashboard</button>
+        <button onClick={() => navigate('/schedule')} className="btn">View Schedule</button>
+        <button onClick={() => navigate('/leaves')} className="btn">Request Leave</button>
+      </div>
 
       <div className="card p-6 mb-6">
         <div className="flex justify-between items-center">

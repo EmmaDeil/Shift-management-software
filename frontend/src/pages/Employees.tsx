@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { Employee } from '../types';
 
 const Employees = () => {
+  const navigate = useNavigate();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +30,11 @@ const Employees = () => {
   return (
     <div>
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">Employees</h1>
+
+      <div className="mb-4 flex gap-2">
+        <button onClick={() => navigate('/dashboard')} className="btn">← Back to Dashboard</button>
+        <button onClick={() => navigate('/schedule')} className="btn">View Schedule</button>
+      </div>
 
       <div className="card p-6">
         {loading && <p>Loading employees...</p>}

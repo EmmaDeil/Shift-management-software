@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -6,6 +7,7 @@ import { Leave } from '../types';
 
 const Leaves = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -77,6 +79,12 @@ const Leaves = () => {
         <button onClick={() => setShowForm(!showForm)} className="btn btn-primary">
           {showForm ? 'Cancel' : 'Request Leave'}
         </button>
+      </div>
+
+      <div className="mb-4 flex gap-2">
+        <button onClick={() => navigate('/dashboard')} className="btn">← Back to Dashboard</button>
+        <button onClick={() => navigate('/schedule')} className="btn">View Schedule</button>
+        <button onClick={() => navigate('/attendance')} className="btn">Attendance</button>
       </div>
 
       {showForm && (
