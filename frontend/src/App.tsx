@@ -8,6 +8,7 @@ import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
 import Schedule from './pages/Schedule'
+import ShiftOverview from './pages/ShiftOverview'
 import Employees from './pages/Employees'
 import Attendance from './pages/Attendance'
 import Leaves from './pages/Leaves'
@@ -15,6 +16,7 @@ import Swaps from './pages/Swaps'
 import Reports from './pages/Reports'
 import Profile from './pages/Profile'
 import Settings from './pages/Settings'
+import RoleGate from './components/RoleGate'
 
 function App() {
   return (
@@ -33,15 +35,16 @@ function App() {
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/" element={<Layout />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="schedule" element={<Schedule />} />
-            <Route path="employees" element={<Employees />} />
-            <Route path="attendance" element={<Attendance />} />
-            <Route path="leaves" element={<Leaves />} />
-            <Route path="swaps" element={<Swaps />} />
-            <Route path="reports" element={<Reports />} />
-            <Route path="profile" element={<Profile />} />
-            <Route path="settings" element={<Settings />} />
+            <Route path="dashboard" element={<RoleGate><Dashboard /></RoleGate>} />
+            <Route path="schedule" element={<RoleGate><Schedule /></RoleGate>} />
+            <Route path="shift-overview" element={<RoleGate allowedRoles={['admin', 'manager']}><ShiftOverview /></RoleGate>} />
+            <Route path="employees" element={<RoleGate allowedRoles={['admin', 'manager']}><Employees /></RoleGate>} />
+            <Route path="attendance" element={<RoleGate><Attendance /></RoleGate>} />
+            <Route path="leaves" element={<RoleGate><Leaves /></RoleGate>} />
+            <Route path="swaps" element={<RoleGate><Swaps /></RoleGate>} />
+            <Route path="reports" element={<RoleGate allowedRoles={['admin', 'manager']}><Reports /></RoleGate>} />
+            <Route path="profile" element={<RoleGate><Profile /></RoleGate>} />
+            <Route path="settings" element={<RoleGate><Settings /></RoleGate>} />
           </Route>
         </Routes>
       </AuthProvider>

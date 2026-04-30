@@ -1,19 +1,24 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { FiHome, FiCalendar, FiUsers, FiClock, FiFileText, FiRepeat, FiBarChart2, FiMenu, FiX } from 'react-icons/fi';
+import { useAuth } from '../context/AuthContext';
 
 const Sidebar = () => {
   const [isOpen, setIsOpen] = useState(true);
   const location = useLocation();
+  const { user } = useAuth();
+
+  const isManagement = user?.role === 'admin' || user?.role === 'manager';
 
   const menuItems = [
     { path: '/dashboard', icon: FiHome, label: 'Dashboard' },
     { path: '/schedule', icon: FiCalendar, label: 'Schedule' },
-    { path: '/employees', icon: FiUsers, label: 'Employees' },
+    ...(isManagement ? [{ path: '/shift-overview', icon: FiBarChart2, label: 'All Shifts' }] : []),
     { path: '/attendance', icon: FiClock, label: 'Attendance' },
     { path: '/leaves', icon: FiFileText, label: 'Leaves' },
     { path: '/swaps', icon: FiRepeat, label: 'Shift Swaps' },
-    { path: '/reports', icon: FiBarChart2, label: 'Reports' },
+    ...(isManagement ? [{ path: '/employees', icon: FiUsers, label: 'Employees' }] : []),
+    ...(isManagement ? [{ path: '/reports', icon: FiBarChart2, label: 'Reports' }] : []),
   ];
 
   return (
@@ -32,7 +37,10 @@ const Sidebar = () => {
       >
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-center h-16 border-b border-gray-200 dark:border-gray-700">
-            <h1 className="text-2xl font-bold text-primary-600">ShiftFlow</h1>
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-primary-600">ShiftFlow</h1>
+              <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">{user?.role || 'employee'} workspace</p>
+            </div>
           </div>
 
           <nav className="flex-1 overflow-y-auto p-4">

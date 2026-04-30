@@ -11,7 +11,7 @@ const {
 
 router.use(protect);
 
-router.get('/dashboard', getDashboardAnalytics);
+router.get('/dashboard', authorize('admin', 'manager'), getDashboardAnalytics);
 router.get('/attendance-trends', authorize('admin', 'manager'), getAttendanceTrends);
 router.get('/labor-cost', authorize('admin', 'manager'), getLaborCost);
 router.get('/employee-performance', authorize('admin', 'manager'), getEmployeePerformance);

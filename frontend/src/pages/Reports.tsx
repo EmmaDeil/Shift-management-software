@@ -1,15 +1,24 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 
 type ReportType = 'attendance' | 'schedule' | 'leaves' | 'payroll';
 
 const Reports = () => {
+  const { user } = useAuth();
+  const canViewPayroll = user?.role === 'admin';
   const [type, setType] = useState<ReportType>('attendance');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!canViewPayroll && type === 'payroll') {
+      setType('attendance');
+    }
+  }, [canViewPayroll, type]);
 
   const fetchReport = async () => {
     if (!startDate || !endDate) return toast.error('Select start and end dates');
@@ -57,7 +66,7 @@ const Reports = () => {
             <option value="attendance">Attendance</option>
             <option value="schedule">Schedule</option>
             <option value="leaves">Leaves</option>
-            <option value="payroll">Payroll</option>
+            {canViewPayroll && <option value="payroll">Payroll</option>}
           </select>
 
           <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="col-span-1" />

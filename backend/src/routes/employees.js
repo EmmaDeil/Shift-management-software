@@ -13,9 +13,9 @@ const {
 
 router.use(protect);
 
-router.get('/', getEmployees);
+router.get('/', authorize('admin', 'manager'), getEmployees);
 router.post('/', authorize('admin', 'manager'), createEmployee);
-router.get('/:id', getEmployeeById);
+router.get('/:id', authorize('admin', 'manager'), getEmployeeById);
 router.get('/:id/availability', getEmployeeAvailability);
 router.put('/:id', authorize('admin', 'manager'), updateEmployee);
 router.put('/:id/availability', updateEmployeeAvailability);

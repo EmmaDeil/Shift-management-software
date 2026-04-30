@@ -2,9 +2,12 @@ import { useEffect, useState } from 'react';
 import api from '../utils/api';
 import { useNavigate } from 'react-router-dom';
 import { Shift } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isManagement = user?.role === 'admin' || user?.role === 'manager';
   const [stats, setStats] = useState({
     totalEmployees: 0,
     todayShifts: 0,
@@ -18,6 +21,11 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!isManagement) {
+      setLoading(false);
+      return;
+    }
+
     const fetch = async () => {
       try {
         const res = await api.get('/analytics/dashboard');
@@ -34,7 +42,7 @@ const Dashboard = () => {
     // Auto-refresh every 60 seconds
     const interval = setInterval(fetch, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isManagement]);
 
   const StatCard = ({ title, value, color, onClick }: { title: string; value: number | string; color?: string; onClick?: () => void }) => (
     <div onClick={onClick} className={`card p-6 cursor-pointer hover:shadow-lg transition ${onClick ? 'hover:bg-gray-50 dark:hover:bg-gray-700' : ''}`}>
@@ -43,9 +51,69 @@ const Dashboard = () => {
     </div>
   );
 
+  if (!isManagement) {
+    return (
+      <div>
+        <div className="flex items-start justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Employee Workspace</h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-2">
+              Your role controls access, but your account remains linked to the employee workflow.
+            </p>
+          </div>
+          <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-sm font-medium capitalize">
+            {user?.role}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          <button onClick={() => navigate('/attendance')} className="card p-5 text-left hover:shadow-lg transition">
+            <p className="font-semibold text-blue-600">Clock In / Out</p>
+            <p className="text-sm text-gray-600 mt-1">Record today&apos;s attendance</p>
+          </button>
+          <button onClick={() => navigate('/schedule')} className="card p-5 text-left hover:shadow-lg transition">
+            <p className="font-semibold text-green-600">My Schedule</p>
+            <p className="text-sm text-gray-600 mt-1">View assigned shifts</p>
+          </button>
+          <button onClick={() => navigate('/leaves')} className="card p-5 text-left hover:shadow-lg transition">
+            <p className="font-semibold text-orange-600">Request Leave</p>
+            <p className="text-sm text-gray-600 mt-1">Submit time off requests</p>
+          </button>
+          <button onClick={() => navigate('/swaps')} className="card p-5 text-left hover:shadow-lg transition">
+            <p className="font-semibold text-purple-600">Swap Shift</p>
+            <p className="text-sm text-gray-600 mt-1">Coordinate coverage with coworkers</p>
+          </button>
+          <button onClick={() => navigate('/profile')} className="card p-5 text-left hover:shadow-lg transition">
+            <p className="font-semibold text-gray-700 dark:text-gray-200">My Profile</p>
+            <p className="text-sm text-gray-600 mt-1">Keep your employee record current</p>
+          </button>
+          <button onClick={() => navigate('/settings')} className="card p-5 text-left hover:shadow-lg transition">
+            <p className="font-semibold text-gray-700 dark:text-gray-200">Preferences</p>
+            <p className="text-sm text-gray-600 mt-1">Theme, language, and notifications</p>
+          </button>
+        </div>
+
+        <div className="card p-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Employee-linked access</h2>
+          <p className="text-gray-600 dark:text-gray-400">
+            Admin and manager users still keep the same employee context, so scheduling, attendance, leave, and swap flows continue to work the same way.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
-      <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">Dashboard</h1>
+      <div className="flex items-start justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{user?.role === 'admin' ? 'Admin Dashboard' : 'Manager Dashboard'}</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">Management overview with team and operations controls.</p>
+        </div>
+        <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-800 text-sm font-medium capitalize">
+          {user?.role}
+        </span>
+      </div>
       
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
@@ -133,21 +201,21 @@ const Dashboard = () => {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <button onClick={() => navigate('/attendance')} className="card p-4 text-center hover:shadow-lg transition">
-          <p className="font-semibold text-blue-600">⏱️ Clock In</p>
-          <p className="text-xs text-gray-600">Attendance</p>
-        </button>
-        <button onClick={() => navigate('/leaves')} className="card p-4 text-center hover:shadow-lg transition">
-          <p className="font-semibold text-green-600">📅 Request Leave</p>
-          <p className="text-xs text-gray-600">Time Off</p>
-        </button>
-        <button onClick={() => navigate('/swaps')} className="card p-4 text-center hover:shadow-lg transition">
-          <p className="font-semibold text-purple-600">🔄 Swap Shift</p>
-          <p className="text-xs text-gray-600">Shifts</p>
+        <button onClick={() => navigate('/employees')} className="card p-4 text-center hover:shadow-lg transition">
+          <p className="font-semibold text-blue-600">👥 Team</p>
+          <p className="text-xs text-gray-600">Employees</p>
         </button>
         <button onClick={() => navigate('/reports')} className="card p-4 text-center hover:shadow-lg transition">
-          <p className="font-semibold text-orange-600">📊 Reports</p>
+          <p className="font-semibold text-green-600">📊 Reports</p>
           <p className="text-xs text-gray-600">Analytics</p>
+        </button>
+        <button onClick={() => navigate('/schedule')} className="card p-4 text-center hover:shadow-lg transition">
+          <p className="font-semibold text-purple-600">🗓️ Schedule</p>
+          <p className="text-xs text-gray-600">Planning</p>
+        </button>
+        <button onClick={() => navigate('/attendance')} className="card p-4 text-center hover:shadow-lg transition">
+          <p className="font-semibold text-orange-600">⏱️ Attendance</p>
+          <p className="text-xs text-gray-600">Time tracking</p>
         </button>
       </div>
     </div>

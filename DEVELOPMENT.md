@@ -83,7 +83,6 @@ backend/
 │   │   ├── logger.js        # Winston logger setup
 │   │   ├── queue.js         # Bull queue setup
 │   │   ├── email.js         # Nodemailer config
-│   │   └── s3.js            # AWS S3 config
 │   │
 │   ├── models/              # Mongoose models
 │   │   ├── User.js          # User model

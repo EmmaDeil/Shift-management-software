@@ -80,6 +80,12 @@ const Profile = () => {
     <div>
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">My Profile</h1>
 
+      {user?.role !== 'employee' && (
+        <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200">
+          This account has {user?.role} permissions, and it still stays linked to the employee workflow.
+        </div>
+      )}
+
       <div className="card p-6 max-w-2xl">
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700">First Name</label>
