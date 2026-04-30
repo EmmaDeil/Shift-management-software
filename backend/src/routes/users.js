@@ -1,23 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middleware/auth');
+const {
+  getUsers,
+  getUserById,
+  updateUser,
+  deleteUser,
+} = require('../controllers/userController');
 
 router.use(protect);
 
-router.get('/', (req, res) => {
-  res.status(501).json({ status: 'error', message: 'Not implemented yet' });
-});
-
-router.get('/:id', (req, res) => {
-  res.status(501).json({ status: 'error', message: 'Not implemented yet' });
-});
-
-router.put('/:id', (req, res) => {
-  res.status(501).json({ status: 'error', message: 'Not implemented yet' });
-});
-
-router.delete('/:id', authorize('admin'), (req, res) => {
-  res.status(501).json({ status: 'error', message: 'Not implemented yet' });
-});
+router.get('/', authorize('admin', 'manager'), getUsers);
+router.get('/:id', getUserById);
+router.put('/:id', updateUser);
+router.delete('/:id', authorize('admin'), deleteUser);
 
 module.exports = router;
