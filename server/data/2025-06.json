@@ -1,0 +1,58 @@
+{
+  "month": "2025-06",
+  "people": [
+    {
+      "id": "ma7hulhn",
+      "name": "Alice",
+      "active": true,
+      "color": "#2563eb"
+    },
+    {
+      "id": "nb4um0yi",
+      "name": "Bode",
+      "active": true,
+      "color": "#dc2626"
+    },
+    {
+      "id": "r6slizpo",
+      "name": "Sandra",
+      "active": true,
+      "color": "#16a34a"
+    }
+  ],
+  "timeSlots": [
+    {
+      "id": "morning",
+      "label": "Morning"
+    },
+    {
+      "id": "afternoon",
+      "label": "Afternoon"
+    }
+  ],
+  "assignments": {},
+  "stats": [
+    {
+      "personId": "ma7hulhn",
+      "name": "Alice",
+      "shifts": 0,
+      "hours": 0,
+      "overHours": 0
+    },
+    {
+      "personId": "nb4um0yi",
+      "name": "Bode",
+      "shifts": 0,
+      "hours": 0,
+      "overHours": 0
+    },
+    {
+      "personId": "r6slizpo",
+      "name": "Sandra",
+      "shifts": 0,
+      "hours": 0,
+      "overHours": 0
+    }
+  ],
+  "updatedAt": "2025-10-14T20:50:36.293Z"
+}

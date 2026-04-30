@@ -1,0 +1,107 @@
+const mongoose = require('mongoose');
+
+const shiftSchema = new mongoose.Schema(
+  {
+    title: {
+      type: String,
+      required: [true, 'Please provide shift title'],
+      trim: true,
+    },
+    description: {
+      type: String,
+      trim: true,
+    },
+    employee: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Employee',
+      required: true,
+    },
+    startTime: {
+      type: Date,
+      required: [true, 'Please provide start time'],
+    },
+    endTime: {
+      type: Date,
+      required: [true, 'Please provide end time'],
+    },
+    breakDuration: {
+      type: Number,
+      default: 0, // in minutes
+    },
+    location: {
+      type: String,
+      trim: true,
+    },
+    department: {
+      type: String,
+      trim: true,
+    },
+    status: {
+      type: String,
+      enum: ['scheduled', 'in-progress', 'completed', 'cancelled', 'no-show'],
+      default: 'scheduled',
+    },
+    type: {
+      type: String,
+      enum: ['regular', 'overtime', 'on-call', 'training'],
+      default: 'regular',
+    },
+    notes: {
+      type: String,
+    },
+    color: {
+      type: String,
+      default: '#3b82f6',
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    updatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    isRecurring: {
+      type: Boolean,
+      default: false,
+    },
+    recurringPattern: {
+      frequency: {
+        type: String,
+        enum: ['daily', 'weekly', 'monthly'],
+      },
+      interval: Number,
+      endDate: Date,
+    },
+  },
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  }
+);
+
+// Virtual for duration in hours
+shiftSchema.virtual('durationHours').get(function () {
+  if (this.startTime && this.endTime) {
+    const duration = (this.endTime - this.startTime) / (1000 * 60 * 60);
+    return Math.max(0, duration - this.breakDuration / 60);
+  }
+  return 0;
+});
+
+// Index for queries
+shiftSchema.index({ employee: 1, startTime: 1 });
+shiftSchema.index({ status: 1 });
+shiftSchema.index({ startTime: 1, endTime: 1 });
+
+// Validate that end time is after start time
+shiftSchema.pre('save', function (next) {
+  if (this.endTime <= this.startTime) {
+    next(new Error('End time must be after start time'));
+  }
+  next();
+});
+
+module.exports = mongoose.model('Shift', shiftSchema);
