@@ -6,9 +6,11 @@ import { useAuth } from '../context/AuthContext';
 import ReassignShiftModal from '../components/ReassignShiftModal';
 import toast from 'react-hot-toast';
 import { Calendar, dateFnsLocalizer, Event } from 'react-big-calendar';
+import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { enUS } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
+import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 
 const locales = {
   'en-US': enUS,
@@ -21,6 +23,8 @@ const localizer = dateFnsLocalizer({
   getDay,
   locales,
 });
+
+const DnDCalendar = withDragAndDrop(Calendar as any);
 
 const formatDate = (iso?: string | Date) => {
   if (!iso) return '—';
@@ -40,10 +44,23 @@ const Schedule = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [shifts, setShifts] = useState<Shift[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [creatingShift, setCreatingShift] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createForm, setCreateForm] = useState({
+    title: '',
+    employee: '',
+    startTime: '',
+    endTime: '',
+    type: 'regular',
+    location: '',
+    notes: '',
+  });
   const [employeeFilter, setEmployeeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [startDateFilter, setStartDateFilter] = useState('');
@@ -53,6 +70,9 @@ const Schedule = () => {
 
   useEffect(() => {
     fetchShifts();
+    if (isManagerOrAdmin) {
+      fetchEmployees();
+    }
   }, []);
 
   const fetchShifts = async () => {
@@ -66,6 +86,17 @@ const Schedule = () => {
       setError(err.response?.data?.message || 'Failed to load shifts');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchEmployees = async () => {
+    try {
+      const res = await api.get('/employees', { params: { limit: 500 } });
+      const payload = res.data.data || res.data;
+      const employeeList = payload.employees || payload.data || payload;
+      setEmployees(Array.isArray(employeeList) ? employeeList : []);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to load employees for scheduling');
     }
   };
 
@@ -86,6 +117,69 @@ const Schedule = () => {
   const handleReassignSuccess = () => {
     toast.success('Shift reassigned successfully!');
     fetchShifts();
+  };
+
+  const openCreateModal = (start?: Date, end?: Date) => {
+    if (!isManagerOrAdmin) return;
+
+    const fallbackStart = start || new Date();
+    const fallbackEnd = end || new Date(fallbackStart.getTime() + 8 * 60 * 60 * 1000);
+
+    setCreateError(null);
+    setCreateForm({
+      title: '',
+      employee: '',
+      startTime: fallbackStart.toISOString().slice(0, 16),
+      endTime: fallbackEnd.toISOString().slice(0, 16),
+      type: 'regular',
+      location: '',
+      notes: '',
+    });
+    setIsCreateModalOpen(true);
+  };
+
+  const closeCreateModal = () => {
+    setIsCreateModalOpen(false);
+    setCreateError(null);
+  };
+
+  const handleCreateShift = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreateError(null);
+
+    if (!createForm.title || !createForm.employee || !createForm.startTime || !createForm.endTime) {
+      setCreateError('Title, employee, start time, and end time are required');
+      return;
+    }
+
+    const start = new Date(createForm.startTime);
+    const end = new Date(createForm.endTime);
+
+    if (end <= start) {
+      setCreateError('End time must be after start time');
+      return;
+    }
+
+    setCreatingShift(true);
+    try {
+      await api.post('/shifts', {
+        title: createForm.title,
+        employee: createForm.employee,
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+        type: createForm.type,
+        location: createForm.location,
+        notes: createForm.notes,
+      });
+
+      toast.success('Shift created successfully');
+      closeCreateModal();
+      fetchShifts();
+    } catch (err: any) {
+      setCreateError(err.response?.data?.message || 'Failed to create shift');
+    } finally {
+      setCreatingShift(false);
+    }
   };
 
   const employeeOptions = useMemo(() => {
@@ -187,12 +281,41 @@ const Schedule = () => {
     setSelectedShift(event.resource);
   };
 
+  const handleSelectSlot = (slotInfo: any) => {
+    if (!isManagerOrAdmin) return;
+    openCreateModal(slotInfo.start, slotInfo.end);
+  };
+
+  const handleEventTimeChange = async ({ event, start, end }: any) => {
+    if (!isManagerOrAdmin) return;
+
+    const shift = event?.resource;
+    const shiftId = shift?.id || shift?._id;
+    if (!shiftId) {
+      toast.error('Unable to update shift time');
+      return;
+    }
+
+    try {
+      await api.put(`/shifts/${shiftId}`, {
+        startTime: new Date(start).toISOString(),
+        endTime: new Date(end).toISOString(),
+      });
+
+      toast.success('Shift schedule updated');
+      fetchShifts();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to update shift time');
+      fetchShifts();
+    }
+  };
+
   return (
     <div>
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">Schedule</h1>
       <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
         {isManagerOrAdmin
-          ? 'Calendar view for all employees. Click any shift to reassign.'
+          ? 'Calendar view for all employees. Click a shift to reassign or click an empty slot to create a new shift.'
           : 'Your assigned shifts in calendar view.'}
       </p>
 
@@ -205,6 +328,9 @@ const Schedule = () => {
         )}
         <button onClick={() => navigate('/swaps')} className="btn">Request Swap</button>
         <button onClick={() => navigate('/attendance')} className="btn">Clock In/Out</button>
+        {isManagerOrAdmin && (
+          <button onClick={() => openCreateModal()} className="btn btn-primary">Create Shift</button>
+        )}
       </div>
 
       <div className="card p-4 mb-4">
@@ -273,7 +399,7 @@ const Schedule = () => {
         {!loading && !error && calendarEvents.length > 0 && (
           <div className="overflow-x-auto">
             <div className="min-w-[760px] md:min-w-0">
-              <Calendar
+              <DnDCalendar
                 localizer={localizer}
                 events={calendarEvents}
                 startAccessor="start"
@@ -285,12 +411,129 @@ const Schedule = () => {
                 popup
                 selectable
                 onSelectEvent={handleSelectEvent}
+                onSelectSlot={handleSelectSlot}
                 eventPropGetter={eventStyleGetter}
+                draggableAccessor={() => isManagerOrAdmin}
+                resizable={isManagerOrAdmin}
+                onEventDrop={handleEventTimeChange}
+                onEventResize={handleEventTimeChange}
               />
             </div>
           </div>
         )}
       </div>
+
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full p-6">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Create Shift</h2>
+
+            {createError && (
+              <div className="mb-4 p-3 rounded bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                {createError}
+              </div>
+            )}
+
+            <form onSubmit={handleCreateShift} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
+                  <input
+                    value={createForm.title}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, title: e.target.value }))}
+                    className="input w-full"
+                    placeholder="Morning Shift"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Employee</label>
+                  <select
+                    value={createForm.employee}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, employee: e.target.value }))}
+                    className="input w-full"
+                    required
+                  >
+                    <option value="">Select employee...</option>
+                    {employees.map((emp: any, index) => {
+                      const empId = emp.id || emp._id || `emp-${index}`;
+                      return (
+                        <option key={`${empId}-${index}`} value={empId}>
+                          {emp.user?.firstName} {emp.user?.lastName}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start</label>
+                  <input
+                    type="datetime-local"
+                    value={createForm.startTime}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, startTime: e.target.value }))}
+                    className="input w-full"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End</label>
+                  <input
+                    type="datetime-local"
+                    value={createForm.endTime}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, endTime: e.target.value }))}
+                    className="input w-full"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
+                  <select
+                    value={createForm.type}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, type: e.target.value }))}
+                    className="input w-full"
+                  >
+                    <option value="regular">Regular</option>
+                    <option value="overtime">Overtime</option>
+                    <option value="on-call">On-call</option>
+                    <option value="training">Training</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Location</label>
+                  <input
+                    value={createForm.location}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, location: e.target.value }))}
+                    className="input w-full"
+                    placeholder="Main Branch"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes</label>
+                <textarea
+                  value={createForm.notes}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, notes: e.target.value }))}
+                  className="input w-full min-h-[90px]"
+                  placeholder="Optional scheduling notes"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={closeCreateModal} className="btn" disabled={creatingShift}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={creatingShift}>
+                  {creatingShift ? 'Creating...' : 'Create Shift'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {selectedShift && (
         <div className="card p-6 mt-4">

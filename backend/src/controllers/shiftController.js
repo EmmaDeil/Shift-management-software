@@ -100,13 +100,25 @@ exports.getShiftById = async (req, res, next) => {
 exports.createShift = async (req, res, next) => {
   try {
     const {
+      title,
+      description,
       employee,
       startTime,
       endTime,
-      position,
+      breakDuration,
       location,
+      department,
+      type,
+      color,
       notes,
     } = req.body;
+
+    if (!title) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Please provide shift title',
+      });
+    }
 
     // Validate employee exists
     const employeeDoc = await Employee.findById(employee);
@@ -137,11 +149,16 @@ exports.createShift = async (req, res, next) => {
 
     // Create shift
     const shift = await Shift.create({
+      title,
+      description,
       employee,
       startTime,
       endTime,
-      position,
+      breakDuration,
       location,
+      department,
+      type,
+      color,
       notes,
       createdBy: req.user.id,
     });
@@ -153,12 +170,13 @@ exports.createShift = async (req, res, next) => {
 
     // Create notification for employee
     await Notification.create({
-      user: employeeDoc.user,
-      type: 'shift_assigned',
+      recipient: employeeDoc.user,
+      type: 'shift-assigned',
       title: 'New Shift Assigned',
       message: `You have been assigned a shift on ${new Date(startTime).toLocaleDateString()}`,
-      relatedModel: 'Shift',
-      relatedId: shift._id,
+      priority: 'medium',
+      actionUrl: '/schedule',
+      data: { shiftId: shift._id },
     });
 
     logger.info(`Shift created: ${shift._id} by ${req.user.email}`);
@@ -187,11 +205,16 @@ exports.updateShift = async (req, res, next) => {
     }
 
     const {
+      title,
+      description,
       employee,
       startTime,
       endTime,
-      position,
+      breakDuration,
       location,
+      department,
+      type,
+      color,
       status,
       notes,
     } = req.body;
@@ -222,11 +245,16 @@ exports.updateShift = async (req, res, next) => {
     }
 
     // Update fields
+    if (title) shift.title = title;
+    if (description) shift.description = description;
     if (employee) shift.employee = employee;
     if (startTime) shift.startTime = startTime;
     if (endTime) shift.endTime = endTime;
-    if (position) shift.position = position;
+    if (breakDuration !== undefined) shift.breakDuration = breakDuration;
     if (location) shift.location = location;
+    if (department) shift.department = department;
+    if (type) shift.type = type;
+    if (color) shift.color = color;
     if (status) shift.status = status;
     if (notes) shift.notes = notes;
 
@@ -239,12 +267,13 @@ exports.updateShift = async (req, res, next) => {
     // Notify employee of changes
     const employeeDoc = await Employee.findById(shift.employee);
     await Notification.create({
-      user: employeeDoc.user,
-      type: 'shift_updated',
+      recipient: employeeDoc.user,
+      type: 'shift-updated',
       title: 'Shift Updated',
       message: `Your shift on ${new Date(shift.startTime).toLocaleDateString()} has been updated`,
-      relatedModel: 'Shift',
-      relatedId: shift._id,
+      priority: 'medium',
+      actionUrl: '/schedule',
+      data: { shiftId: shift._id },
     });
 
     logger.info(`Shift updated: ${shift._id} by ${req.user.email}`);
@@ -279,12 +308,13 @@ exports.deleteShift = async (req, res, next) => {
     // Notify employee
     const employeeDoc = await Employee.findById(shift.employee);
     await Notification.create({
-      user: employeeDoc.user,
-      type: 'shift_cancelled',
+      recipient: employeeDoc.user,
+      type: 'shift-cancelled',
       title: 'Shift Cancelled',
       message: `Your shift on ${new Date(shift.startTime).toLocaleDateString()} has been cancelled`,
-      relatedModel: 'Shift',
-      relatedId: shift._id,
+      priority: 'high',
+      actionUrl: '/schedule',
+      data: { shiftId: shift._id },
     });
 
     logger.info(`Shift cancelled: ${shift._id} by ${req.user.email}`);

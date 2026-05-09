@@ -186,7 +186,7 @@ const Swaps = () => {
             {shifts.map((s, index) => {
               const shiftId = getEntityId(s, `shift-${index}`);
               return (
-              <option key={shiftId} value={shiftId}>
+              <option key={`request-shift-${shiftId}-${index}`} value={shiftId}>
                 {s.title || 'Shift'} - {new Date(s.startTime).toLocaleString()}
               </option>
               );
@@ -198,7 +198,7 @@ const Swaps = () => {
             {employees.map((e, index) => {
               const employeeId = getEntityId(e, `employee-${index}`);
               return (
-              <option key={employeeId} value={employeeId}>
+              <option key={`employee-${employeeId}-${index}`} value={employeeId}>
                 {e.user?.firstName} {e.user?.lastName}
               </option>
               );
@@ -210,7 +210,7 @@ const Swaps = () => {
             {shifts.map((s, index) => {
               const shiftId = getEntityId(s, `offered-shift-${index}`);
               return (
-              <option key={shiftId} value={shiftId}>
+              <option key={`offered-shift-${shiftId}-${index}`} value={shiftId}>
                 {s.title || 'Shift'} - {new Date(s.startTime).toLocaleString()}
               </option>
               );
@@ -236,7 +236,7 @@ const Swaps = () => {
               const swapId = getEntityId(swap, `swap-${index}`);
 
               return (
-              <div key={swapId} className="border border-gray-200 rounded-lg p-4 dark:border-gray-700">
+              <div key={`swap-card-${swapId}-${index}`} className="border border-gray-200 rounded-lg p-4 dark:border-gray-700">
                 <div className="flex justify-between items-start mb-3">
                   <div>
                     <h3 className="font-semibold text-gray-900 dark:text-white">
