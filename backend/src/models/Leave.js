@@ -39,6 +39,13 @@ const leaveSchema = new mongoose.Schema(
     reviewNotes: {
       type: String,
     },
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    approvedAt: {
+      type: Date,
+    },
     attachments: [
       {
         filename: String,

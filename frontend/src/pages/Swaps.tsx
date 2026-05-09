@@ -6,13 +6,13 @@ import { useNavigate } from 'react-router-dom';
 
 interface SwapRequest {
   id: string;
-  requestedBy: { _id: string; user: { firstName: string; lastName: string; email: string } };
-  requestedTo: { _id: string; user: { firstName: string; lastName: string; email: string } };
-  shift: { _id: string; startTime: Date; endTime: Date; title: string };
-  offeredShift?: { _id: string; startTime: Date; endTime: Date; title: string };
-  status: 'pending' | 'accepted' | 'approved' | 'rejected';
-  peerResponse?: string;
-  managerResponse?: string;
+  requester: { _id: string; user: { firstName: string; lastName: string; email: string } };
+  requestedWith: { _id: string; user: { firstName: string; lastName: string; email: string } };
+  requesterShift: { _id: string; startTime: Date; endTime: Date; title: string };
+  requestedShift?: { _id: string; startTime: Date; endTime: Date; title: string };
+  status: 'pending' | 'peer-accepted' | 'peer-rejected' | 'manager-approved' | 'manager-rejected' | 'completed' | 'cancelled';
+  peerResponse?: { status?: string };
+  managerReview?: { status?: string };
   reason?: string;
   createdAt: Date;
 }
@@ -115,12 +115,16 @@ const Swaps = () => {
     switch (status) {
       case 'pending':
         return 'bg-yellow-100 text-yellow-800';
-      case 'accepted':
+      case 'peer-accepted':
         return 'bg-blue-100 text-blue-800';
-      case 'approved':
+      case 'manager-approved':
         return 'bg-green-100 text-green-800';
-      case 'rejected':
+      case 'peer-rejected':
+      case 'manager-rejected':
+      case 'cancelled':
         return 'bg-red-100 text-red-800';
+      case 'completed':
+        return 'bg-emerald-100 text-emerald-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -140,7 +144,7 @@ const Swaps = () => {
           <select name="shiftId" value={form.shiftId} onChange={handleChange} className="mb-4 block w-full px-3 py-2 border rounded">
             <option value="">Select your shift</option>
             {shifts.map((s) => (
-              <option key={s.id} value={s.id}>
+              <option key={s._id || s.id} value={s._id || s.id}>
                 {s.title || 'Shift'} - {new Date(s.startTime).toLocaleString()}
               </option>
             ))}
@@ -149,7 +153,7 @@ const Swaps = () => {
           <select name="requestedToId" value={form.requestedToId} onChange={handleChange} className="mb-4 block w-full px-3 py-2 border rounded">
             <option value="">Select employee to swap with</option>
             {employees.map((e) => (
-              <option key={e.id} value={e.id}>
+              <option key={e._id || e.id} value={e._id || e.id}>
                 {e.user?.firstName} {e.user?.lastName}
               </option>
             ))}
@@ -158,7 +162,7 @@ const Swaps = () => {
           <select name="offeredShiftId" value={form.offeredShiftId} onChange={handleChange} className="mb-4 block w-full px-3 py-2 border rounded">
             <option value="">Select offered shift (optional)</option>
             {shifts.map((s) => (
-              <option key={s.id} value={s.id}>
+              <option key={s._id || s.id} value={s._id || s.id}>
                 {s.title || 'Shift'} - {new Date(s.startTime).toLocaleString()}
               </option>
             ))}
@@ -180,11 +184,11 @@ const Swaps = () => {
         {!loading && swaps.length > 0 && (
           <div className="space-y-4">
             {swaps.map((swap) => (
-              <div key={swap.id} className="border border-gray-200 rounded-lg p-4 dark:border-gray-700">
+              <div key={swap._id || swap.id} className="border border-gray-200 rounded-lg p-4 dark:border-gray-700">
                 <div className="flex justify-between items-start mb-3">
                   <div>
                     <h3 className="font-semibold text-gray-900 dark:text-white">
-                      {swap.requestedBy.user.firstName} {swap.requestedBy.user.lastName} → {swap.requestedTo.user.firstName} {swap.requestedTo.user.lastName}
+                      {swap.requester.user.firstName} {swap.requester.user.lastName} → {swap.requestedWith.user.firstName} {swap.requestedWith.user.lastName}
                     </h3>
                     <p className="text-sm text-gray-600">{swap.reason}</p>
                   </div>
@@ -196,18 +200,18 @@ const Swaps = () => {
                 <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
                   <div>
                     <p className="font-medium text-gray-700">From Shift</p>
-                    <p className="text-gray-600">{new Date(swap.shift.startTime).toLocaleString()}</p>
+                    <p className="text-gray-600">{new Date(swap.requesterShift.startTime).toLocaleString()}</p>
                   </div>
-                  {swap.offeredShift && (
+                  {swap.requestedShift && (
                     <div>
                       <p className="font-medium text-gray-700">To Shift</p>
-                      <p className="text-gray-600">{new Date(swap.offeredShift.startTime).toLocaleString()}</p>
+                      <p className="text-gray-600">{new Date(swap.requestedShift.startTime).toLocaleString()}</p>
                     </div>
                   )}
                 </div>
 
                 {/* Peer response (for requested employee) */}
-                {swap.status === 'pending' && swap.requestedTo._id === (user?.id || (user as any)?._id) && (
+                {swap.status === 'pending' && swap.requestedWith._id === (user?.id || (user as any)?._id) && (
                   <div className="flex gap-2">
                     <button onClick={() => handleRespond(swap.id, true)} className="btn btn-sm btn-primary">
                       Accept
@@ -219,7 +223,7 @@ const Swaps = () => {
                 )}
 
                 {/* Manager review (for managers) */}
-                {swap.status === 'accepted' && user?.role !== 'employee' && (
+                {swap.status === 'peer-accepted' && user?.role !== 'employee' && (
                   <div className="flex gap-2">
                     <button onClick={() => handleApprove(swap.id, true)} className="btn btn-sm btn-primary">
                       Approve
@@ -233,12 +237,12 @@ const Swaps = () => {
                 {/* Status badges for responses */}
                 {swap.peerResponse && (
                   <p className="text-sm mt-2 text-gray-600">
-                    Peer response: <span className="font-medium">{swap.peerResponse}</span>
+                    Peer response: <span className="font-medium">{swap.peerResponse.status || 'pending'}</span>
                   </p>
                 )}
-                {swap.managerResponse && (
+                {swap.managerReview && (
                   <p className="text-sm text-gray-600">
-                    Manager decision: <span className="font-medium">{swap.managerResponse}</span>
+                    Manager decision: <span className="font-medium">{swap.managerReview.status || 'pending'}</span>
                   </p>
                 )}
               </div>

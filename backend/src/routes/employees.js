@@ -13,7 +13,8 @@ const {
 
 router.use(protect);
 
-router.get('/', authorize('admin', 'manager'), getEmployees);
+// Allow any authenticated user to list employees (employees need to see peers)
+router.get('/', getEmployees);
 router.post('/', authorize('admin', 'manager'), createEmployee);
 router.get('/:id', authorize('admin', 'manager'), getEmployeeById);
 router.get('/:id/availability', getEmployeeAvailability);

@@ -13,10 +13,10 @@ exports.getNotifications = async (req, res, next) => {
     } = req.query;
 
     // Build query
-    const query = { user: req.user.id };
+    const query = { recipient: req.user.id };
     
     if (unreadOnly === 'true') {
-      query.read = false;
+      query.isRead = false;
     }
 
     // Execute query with pagination
@@ -28,8 +28,8 @@ exports.getNotifications = async (req, res, next) => {
 
     const total = await Notification.countDocuments(query);
     const unreadCount = await Notification.countDocuments({ 
-      user: req.user.id, 
-      read: false 
+      recipient: req.user.id, 
+      isRead: false 
     });
 
     res.json({
@@ -57,7 +57,7 @@ exports.markAsRead = async (req, res, next) => {
   try {
     const notification = await Notification.findOne({
       _id: req.params.id,
-      user: req.user.id,
+      recipient: req.user.id,
     });
 
     if (!notification) {
@@ -67,7 +67,7 @@ exports.markAsRead = async (req, res, next) => {
       });
     }
 
-    notification.read = true;
+    notification.isRead = true;
     notification.readAt = Date.now();
     await notification.save();
 
@@ -86,8 +86,8 @@ exports.markAsRead = async (req, res, next) => {
 exports.markAllAsRead = async (req, res, next) => {
   try {
     await Notification.updateMany(
-      { user: req.user.id, read: false },
-      { read: true, readAt: Date.now() }
+      { recipient: req.user.id, isRead: false },
+      { isRead: true, readAt: Date.now() }
     );
 
     res.json({
@@ -106,7 +106,7 @@ exports.deleteNotification = async (req, res, next) => {
   try {
     const notification = await Notification.findOneAndDelete({
       _id: req.params.id,
-      user: req.user.id,
+      recipient: req.user.id,
     });
 
     if (!notification) {
@@ -131,8 +131,8 @@ exports.deleteNotification = async (req, res, next) => {
 exports.clearReadNotifications = async (req, res, next) => {
   try {
     const result = await Notification.deleteMany({
-      user: req.user.id,
-      read: true,
+      recipient: req.user.id,
+      isRead: true,
     });
 
     res.json({

@@ -26,14 +26,14 @@ exports.getSwaps = async (req, res, next) => {
       const employeeDoc = await Employee.findOne({ user: req.user.id });
       if (employeeDoc) {
         query.$or = [
-          { requestedBy: employeeDoc._id },
-          { requestedTo: employeeDoc._id },
+          { requester: employeeDoc._id },
+          { requestedWith: employeeDoc._id },
         ];
       }
     } else if (employee) {
       query.$or = [
-        { requestedBy: employee },
-        { requestedTo: employee },
+        { requester: employee },
+        { requestedWith: employee },
       ];
     }
 
@@ -41,16 +41,16 @@ exports.getSwaps = async (req, res, next) => {
     const skip = (page - 1) * limit;
     const swaps = await Swap.find(query)
       .populate({
-        path: 'requestedBy',
+        path: 'requester',
         populate: { path: 'user', select: 'firstName lastName email avatar' },
       })
       .populate({
-        path: 'requestedTo',
+        path: 'requestedWith',
         populate: { path: 'user', select: 'firstName lastName email avatar' },
       })
-      .populate('shift')
-      .populate('offeredShift')
-      .populate('reviewedBy', 'firstName lastName')
+      .populate('requesterShift')
+      .populate('requestedShift')
+      .populate({ path: 'managerReview.reviewedBy', select: 'firstName lastName email' })
       .skip(skip)
       .limit(parseInt(limit))
       .sort('-createdAt');
@@ -81,16 +81,16 @@ exports.getSwapById = async (req, res, next) => {
   try {
     const swap = await Swap.findById(req.params.id)
       .populate({
-        path: 'requestedBy',
+        path: 'requester',
         populate: { path: 'user', select: 'firstName lastName email phone avatar' },
       })
       .populate({
-        path: 'requestedTo',
+        path: 'requestedWith',
         populate: { path: 'user', select: 'firstName lastName email phone avatar' },
       })
-      .populate('shift')
-      .populate('offeredShift')
-      .populate('reviewedBy', 'firstName lastName email');
+      .populate('requesterShift')
+      .populate('requestedShift')
+      .populate({ path: 'managerReview.reviewedBy', select: 'firstName lastName email' });
 
     if (!swap) {
       return res.status(404).json({
@@ -163,34 +163,34 @@ exports.createSwap = async (req, res, next) => {
 
     // Create swap request
     const swap = await Swap.create({
-      requestedBy: requestedBy._id,
-      requestedTo: requestedTo._id,
-      shift: shiftId,
-      offeredShift: offeredShiftId || undefined,
+      requester: requestedBy._id,
+      requestedWith: requestedTo._id,
+      requesterShift: shiftId,
+      requestedShift: offeredShiftId || shiftId,
       reason,
     });
 
     await swap.populate([
       {
-        path: 'requestedBy',
+        path: 'requester',
         populate: { path: 'user', select: 'firstName lastName email' },
       },
       {
-        path: 'requestedTo',
+        path: 'requestedWith',
         populate: { path: 'user', select: 'firstName lastName email' },
       },
-      { path: 'shift' },
-      { path: 'offeredShift' },
+      { path: 'requesterShift' },
+      { path: 'requestedShift' },
     ]);
 
     // Notify requested employee
     await Notification.create({
-      user: requestedTo.user._id,
-      type: 'swap_request',
+      recipient: requestedTo.user._id,
+      type: 'swap-requested',
       title: 'Shift Swap Request',
       message: `${req.user.firstName} ${req.user.lastName} wants to swap shifts with you`,
-      relatedModel: 'Swap',
-      relatedId: swap._id,
+      priority: 'high',
+      actionUrl: '/swaps',
     });
 
     logger.info(`Swap request created: ${swap._id} by ${req.user.email}`);
@@ -212,8 +212,8 @@ exports.respondToSwap = async (req, res, next) => {
     const { accept } = req.body;
 
     const swap = await Swap.findById(req.params.id)
-      .populate('requestedBy')
-      .populate('requestedTo');
+      .populate({ path: 'requester', populate: { path: 'user', select: 'firstName lastName email' } })
+      .populate({ path: 'requestedWith', populate: { path: 'user', select: 'firstName lastName email' } });
 
     if (!swap) {
       return res.status(404).json({
@@ -226,7 +226,7 @@ exports.respondToSwap = async (req, res, next) => {
     const employee = await Employee.findOne({ user: req.user.id });
     
     // Check if user is the requested employee
-    if (swap.requestedTo._id.toString() !== employee._id.toString()) {
+    if (swap.requestedWith._id.toString() !== employee._id.toString()) {
       return res.status(403).json({
         status: 'error',
         message: 'Not authorized to respond to this swap request',
@@ -242,25 +242,25 @@ exports.respondToSwap = async (req, res, next) => {
     }
 
     if (accept) {
-      swap.status = 'accepted';
-      swap.peerResponse = 'accepted';
-      swap.peerResponseAt = Date.now();
+      swap.status = 'peer-accepted';
+      swap.peerResponse.status = 'accepted';
+      swap.peerResponse.respondedAt = Date.now();
     } else {
-      swap.status = 'rejected';
-      swap.peerResponse = 'rejected';
-      swap.peerResponseAt = Date.now();
+      swap.status = 'peer-rejected';
+      swap.peerResponse.status = 'rejected';
+      swap.peerResponse.respondedAt = Date.now();
     }
 
     await swap.save();
 
     // Notify requester
     await Notification.create({
-      user: swap.requestedBy.user,
-      type: accept ? 'swap_accepted' : 'swap_rejected',
+      recipient: swap.requester.user._id,
+      type: accept ? 'swap-accepted' : 'swap-rejected',
       title: `Swap Request ${accept ? 'Accepted' : 'Rejected'}`,
       message: `Your swap request was ${accept ? 'accepted' : 'rejected'}`,
-      relatedModel: 'Swap',
-      relatedId: swap._id,
+      priority: 'medium',
+      actionUrl: '/swaps',
     });
 
     // If accepted, notify managers for approval
@@ -270,12 +270,12 @@ exports.respondToSwap = async (req, res, next) => {
 
       for (const manager of managers) {
         await Notification.create({
-          user: manager._id,
-          type: 'swap_pending_approval',
+          recipient: manager._id,
+          type: 'swap-requested',
           title: 'Swap Awaiting Approval',
           message: 'A shift swap request needs manager approval',
-          relatedModel: 'Swap',
-          relatedId: swap._id,
+          priority: 'medium',
+          actionUrl: '/swaps',
         });
       }
     }
@@ -299,8 +299,10 @@ exports.reviewSwap = async (req, res, next) => {
     const { approve } = req.body;
 
     const swap = await Swap.findById(req.params.id)
-      .populate('requestedBy shift offeredShift')
-      .populate('requestedTo');
+      .populate({ path: 'requester', populate: { path: 'user', select: 'firstName lastName email' } })
+      .populate({ path: 'requestedWith', populate: { path: 'user', select: 'firstName lastName email' } })
+      .populate('requesterShift')
+      .populate('requestedShift');
 
     if (!swap) {
       return res.status(404).json({
@@ -310,7 +312,7 @@ exports.reviewSwap = async (req, res, next) => {
     }
 
     // Can only review accepted swaps
-    if (swap.status !== 'accepted') {
+    if (swap.status !== 'peer-accepted') {
       return res.status(400).json({
         status: 'error',
         message: 'Can only review accepted swap requests',
@@ -318,17 +320,17 @@ exports.reviewSwap = async (req, res, next) => {
     }
 
     if (approve) {
-      swap.status = 'approved';
-      swap.managerResponse = 'approved';
-      swap.reviewedBy = req.user.id;
-      swap.reviewedAt = Date.now();
+      swap.status = 'manager-approved';
+      swap.managerReview.status = 'approved';
+      swap.managerReview.reviewedBy = req.user.id;
+      swap.managerReview.reviewedAt = Date.now();
 
       // Swap the shifts
-      const shift = await Shift.findById(swap.shift);
-      const offeredShift = swap.offeredShift ? await Shift.findById(swap.offeredShift) : null;
+      const shift = await Shift.findById(swap.requesterShift);
+      const offeredShift = swap.requestedShift ? await Shift.findById(swap.requestedShift) : null;
 
       const tempEmployee = shift.employee;
-      shift.employee = swap.requestedTo._id;
+      shift.employee = swap.requestedWith._id;
       
       if (offeredShift) {
         offeredShift.employee = tempEmployee;
@@ -337,31 +339,31 @@ exports.reviewSwap = async (req, res, next) => {
       
       await shift.save();
     } else {
-      swap.status = 'rejected';
-      swap.managerResponse = 'rejected';
-      swap.reviewedBy = req.user.id;
-      swap.reviewedAt = Date.now();
+      swap.status = 'manager-rejected';
+      swap.managerReview.status = 'rejected';
+      swap.managerReview.reviewedBy = req.user.id;
+      swap.managerReview.reviewedAt = Date.now();
     }
 
     await swap.save();
 
     // Notify both employees
     await Notification.create({
-      user: swap.requestedBy.user,
-      type: approve ? 'swap_approved' : 'swap_rejected',
+      recipient: swap.requester.user._id,
+      type: approve ? 'swap-accepted' : 'swap-rejected',
       title: `Swap ${approve ? 'Approved' : 'Rejected'}`,
       message: `Your swap request was ${approve ? 'approved' : 'rejected'} by management`,
-      relatedModel: 'Swap',
-      relatedId: swap._id,
+      priority: 'medium',
+      actionUrl: '/swaps',
     });
 
     await Notification.create({
-      user: swap.requestedTo.user,
-      type: approve ? 'swap_approved' : 'swap_rejected',
+      recipient: swap.requestedWith.user._id,
+      type: approve ? 'swap-accepted' : 'swap-rejected',
       title: `Swap ${approve ? 'Approved' : 'Rejected'}`,
       message: `The swap request was ${approve ? 'approved' : 'rejected'} by management`,
-      relatedModel: 'Swap',
-      relatedId: swap._id,
+      priority: 'medium',
+      actionUrl: '/swaps',
     });
 
     logger.info(`Swap ${approve ? 'approved' : 'rejected'}: ${swap._id} by ${req.user.email}`);
@@ -393,7 +395,7 @@ exports.cancelSwap = async (req, res, next) => {
     const employee = await Employee.findOne({ user: req.user.id });
     
     // Check if user is the requester
-    if (swap.requestedBy.toString() !== employee._id.toString()) {
+    if (swap.requester.toString() !== employee._id.toString()) {
       return res.status(403).json({
         status: 'error',
         message: 'Not authorized to cancel this swap request',
