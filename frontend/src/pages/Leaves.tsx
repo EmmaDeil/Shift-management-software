@@ -4,6 +4,7 @@ import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { Leave } from '../types';
+import LoadingButton from '../components/LoadingButton';
 
 const Leaves = () => {
   const { user } = useAuth();
@@ -11,6 +12,7 @@ const Leaves = () => {
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [actionLoading, setActionLoading] = useState<Record<string, string | null>>({});
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ type: 'vacation', startDate: '', endDate: '', reason: '' });
 
@@ -54,21 +56,27 @@ const Leaves = () => {
 
   const handleApprove = async (id: string) => {
     try {
-      await api.put(`/leaves/${id}/approve`, {});
+      setActionLoading((s) => ({ ...s, [id]: 'approve' }));
+      await api.post(`/leaves/${id}/approve`, {});
       toast.success('Leave approved');
       fetchLeaves();
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to approve');
+    } finally {
+      setActionLoading((s) => ({ ...s, [id]: null }));
     }
   };
 
   const handleReject = async (id: string) => {
     try {
-      await api.put(`/leaves/${id}/reject`, {});
+      setActionLoading((s) => ({ ...s, [id]: 'reject' }));
+      await api.post(`/leaves/${id}/reject`, {});
       toast.success('Leave rejected');
       fetchLeaves();
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to reject');
+    } finally {
+      setActionLoading((s) => ({ ...s, [id]: null }));
     }
   };
 
@@ -100,9 +108,9 @@ const Leaves = () => {
           <input type="date" name="endDate" value={form.endDate} onChange={handleChange} className="mb-4 block w-full" />
           <textarea name="reason" placeholder="Reason" value={form.reason} onChange={handleChange} className="mb-4 block w-full h-20"></textarea>
 
-          <button onClick={handleSubmit} className="btn btn-primary" disabled={creating}>
-            {creating ? 'Submitting...' : 'Submit Request'}
-          </button>
+          <LoadingButton onClick={handleSubmit} className="btn btn-primary" loading={creating}>
+            Submit Request
+          </LoadingButton>
         </div>
       )}
 
@@ -125,25 +133,42 @@ const Leaves = () => {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {leaves.map((leave) => (
-                  <tr key={leave.id}>
-                    <td className="px-4 py-3">{leave.employee?.user?.firstName} {leave.employee?.user?.lastName}</td>
-                    <td className="px-4 py-3">{leave.type}</td>
-                    <td className="px-4 py-3">{new Date(leave.startDate).toLocaleDateString()}</td>
-                    <td className="px-4 py-3">{new Date(leave.endDate).toLocaleDateString()}</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-3 py-1 rounded text-sm ${leave.status === 'pending' ? 'bg-yellow-100' : leave.status === 'approved' ? 'bg-green-100' : 'bg-red-100'}`}>
-                        {leave.status}
-                      </span>
-                    </td>
-                    {user?.role !== 'employee' && leave.status === 'pending' && (
-                      <td className="px-4 py-3 space-x-2">
-                        <button onClick={() => handleApprove(leave.id)} className="btn btn-sm">Approve</button>
-                        <button onClick={() => handleReject(leave.id)} className="btn btn-sm">Reject</button>
+                {leaves.map((leave) => {
+                  const leaveKey = leave.id;
+
+                  return (
+                    <tr key={leaveKey}>
+                      <td className="px-4 py-3">{leave.employee?.user?.firstName} {leave.employee?.user?.lastName}</td>
+                      <td className="px-4 py-3">{leave.type}</td>
+                      <td className="px-4 py-3">{new Date(leave.startDate).toLocaleDateString()}</td>
+                      <td className="px-4 py-3">{new Date(leave.endDate).toLocaleDateString()}</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-3 py-1 rounded text-sm ${leave.status === 'pending' ? 'bg-yellow-100' : leave.status === 'approved' ? 'bg-green-100' : 'bg-red-100'}`}>
+                          {leave.status}
+                        </span>
                       </td>
-                    )}
-                  </tr>
-                ))}
+                      {user?.role !== 'employee' && leave.status === 'pending' && (
+                        <td className="px-4 py-3 space-x-2">
+                          <LoadingButton
+                            onClick={() => handleApprove(leaveKey)}
+                            className="btn btn-sm"
+                            loading={actionLoading[leaveKey] === 'approve'}
+                          >
+                            Approve
+                          </LoadingButton>
+
+                          <LoadingButton
+                            onClick={() => handleReject(leaveKey)}
+                            className="btn btn-sm"
+                            loading={actionLoading[leaveKey] === 'reject'}
+                          >
+                            Reject
+                          </LoadingButton>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

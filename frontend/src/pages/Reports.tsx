@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import LoadingButton from '../components/LoadingButton';
 
 type ReportType = 'attendance' | 'schedule' | 'leaves' | 'payroll';
 
@@ -73,9 +74,15 @@ const Reports = () => {
           <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="col-span-1" />
 
           <div className="col-span-1 flex gap-2">
-            <button onClick={fetchReport} className="btn btn-primary" disabled={loading}>{loading ? 'Loading...' : 'Fetch'}</button>
-            <button onClick={() => downloadReport('excel')} className="btn">Export XLSX</button>
-            <button onClick={() => downloadReport('pdf')} className="btn">Export PDF</button>
+            <LoadingButton onClick={fetchReport} className="btn btn-primary" loading={loading}>
+              Fetch
+            </LoadingButton>
+            <LoadingButton onClick={() => downloadReport('excel')} className="btn" loading={loading}>
+              Export XLSX
+            </LoadingButton>
+            <LoadingButton onClick={() => downloadReport('pdf')} className="btn" loading={loading}>
+              Export PDF
+            </LoadingButton>
           </div>
         </div>
 

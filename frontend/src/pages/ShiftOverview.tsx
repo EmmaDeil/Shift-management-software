@@ -5,6 +5,7 @@ import { Shift, Employee } from '../types';
 import { useAuth } from '../context/AuthContext';
 import RoleGate from '../components/RoleGate';
 import toast from 'react-hot-toast';
+import LoadingButton from '../components/LoadingButton';
 
 const formatDate = (iso?: string | Date) => {
   if (!iso) return '—';
@@ -32,6 +33,7 @@ const ShiftOverview = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [dateRange, setDateRange] = useState({
@@ -93,7 +95,9 @@ const ShiftOverview = () => {
   });
 
   const handleExport = () => {
-    const data = filteredShifts.map((shift) => ({
+    setExporting(true);
+    try {
+      const data = filteredShifts.map((shift) => ({
       Employee: `${shift.employee?.user?.firstName} ${shift.employee?.user?.lastName}`,
       Title: shift.title,
       Start: formatDate(shift.startTime),
@@ -119,6 +123,9 @@ const ShiftOverview = () => {
     a.click();
     window.URL.revokeObjectURL(url);
     toast.success('Shifts exported successfully');
+  } finally {
+    setExporting(false);
+  }
   };
 
   return (
@@ -128,9 +135,9 @@ const ShiftOverview = () => {
 
         <div className="mb-6 flex gap-2 flex-wrap">
           <button onClick={() => navigate('/schedule')} className="btn">← Back to Schedule</button>
-          <button onClick={handleExport} className="btn btn-secondary">
+          <LoadingButton onClick={handleExport} className="btn btn-secondary" loading={exporting}>
             📥 Export as CSV
-          </button>
+          </LoadingButton>
         </div>
 
         {/* Filters */}

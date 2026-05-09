@@ -3,6 +3,7 @@ import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import LoadingButton from '../components/LoadingButton';
 
 interface SwapRequest {
   id: string;
@@ -17,12 +18,39 @@ interface SwapRequest {
   createdAt: Date;
 }
 
+const getEntityId = (item: any, fallback: string) => item?._id || item?.id || fallback;
+
+const getStageState = (swapStatus: string, stage: 'requested' | 'peer' | 'manager') => {
+  if (stage === 'requested') {
+    return 'done';
+  }
+
+  if (stage === 'peer') {
+    if (swapStatus === 'peer-rejected' || swapStatus === 'cancelled') return 'rejected';
+    if (['peer-accepted', 'manager-approved', 'manager-rejected', 'completed'].includes(swapStatus)) return 'done';
+    return 'current';
+  }
+
+  if (swapStatus === 'manager-rejected') return 'rejected';
+  if (['manager-approved', 'completed'].includes(swapStatus)) return 'done';
+  if (swapStatus === 'peer-accepted') return 'current';
+  return 'pending';
+};
+
+const getStageClass = (state: string) => {
+  if (state === 'done') return 'bg-green-100 text-green-800 border-green-200';
+  if (state === 'current') return 'bg-blue-100 text-blue-800 border-blue-200';
+  if (state === 'rejected') return 'bg-red-100 text-red-800 border-red-200';
+  return 'bg-gray-100 text-gray-700 border-gray-200';
+};
+
 const Swaps = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [swaps, setSwaps] = useState<SwapRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [actionLoading, setActionLoading] = useState<Record<string, string | null>>({});
   const [showForm, setShowForm] = useState(false);
   const [shifts, setShifts] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
@@ -33,7 +61,12 @@ const Swaps = () => {
     try {
       const res = await api.get('/swaps');
       const payload = res.data.data || res.data;
-      setSwaps(payload.swaps || payload);
+      const swapsList = payload.swaps || payload.data || payload;
+      const normalized = (Array.isArray(swapsList) ? swapsList : []).map((s: any) => ({
+        ...s,
+        id: s.id || s._id,
+      }));
+      setSwaps(normalized);
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to load swaps');
     } finally {
@@ -55,7 +88,8 @@ const Swaps = () => {
     try {
       const res = await api.get('/employees');
       const payload = res.data.data || res.data;
-      setEmployees(payload.users || payload);
+      const employeesList = payload.employees || payload.users || payload.data || payload;
+      setEmployees(Array.isArray(employeesList) ? employeesList : []);
     } catch (err: any) {
       console.error('Failed to load employees');
     }
@@ -93,21 +127,27 @@ const Swaps = () => {
 
   const handleRespond = async (id: string, accept: boolean) => {
     try {
+      setActionLoading((s) => ({ ...s, [id]: accept ? 'respond-accept' : 'respond-reject' }));
       await api.put(`/swaps/${id}/peer-response`, { accept });
       toast.success(accept ? 'Swap accepted' : 'Swap rejected');
       fetchSwaps();
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to respond');
+    } finally {
+      setActionLoading((s) => ({ ...s, [id]: null }));
     }
   };
 
   const handleApprove = async (id: string, approve: boolean) => {
     try {
+      setActionLoading((s) => ({ ...s, [id]: approve ? 'approve' : 'reject' }));
       await api.put(`/swaps/${id}/manager-review`, { approve });
       toast.success(approve ? 'Swap approved' : 'Swap rejected');
       fetchSwaps();
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to review');
+    } finally {
+      setActionLoading((s) => ({ ...s, [id]: null }));
     }
   };
 
@@ -134,45 +174,54 @@ const Swaps = () => {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Shift Swaps</h1>
-        <button onClick={() => setShowForm(!showForm)} className="btn btn-primary">
+        <LoadingButton onClick={() => setShowForm(!showForm)} className="btn btn-primary" loading={creating && showForm}>
           {showForm ? 'Cancel' : 'Request Swap'}
-        </button>
+        </LoadingButton>
       </div>
 
       {showForm && (
         <div className="card p-6 mb-6 max-w-2xl">
           <select name="shiftId" value={form.shiftId} onChange={handleChange} className="mb-4 block w-full px-3 py-2 border rounded">
             <option value="">Select your shift</option>
-            {shifts.map((s) => (
-              <option key={s._id || s.id} value={s._id || s.id}>
+            {shifts.map((s, index) => {
+              const shiftId = getEntityId(s, `shift-${index}`);
+              return (
+              <option key={shiftId} value={shiftId}>
                 {s.title || 'Shift'} - {new Date(s.startTime).toLocaleString()}
               </option>
-            ))}
+              );
+            })}
           </select>
 
           <select name="requestedToId" value={form.requestedToId} onChange={handleChange} className="mb-4 block w-full px-3 py-2 border rounded">
             <option value="">Select employee to swap with</option>
-            {employees.map((e) => (
-              <option key={e._id || e.id} value={e._id || e.id}>
+            {employees.map((e, index) => {
+              const employeeId = getEntityId(e, `employee-${index}`);
+              return (
+              <option key={employeeId} value={employeeId}>
                 {e.user?.firstName} {e.user?.lastName}
               </option>
-            ))}
+              );
+            })}
           </select>
 
           <select name="offeredShiftId" value={form.offeredShiftId} onChange={handleChange} className="mb-4 block w-full px-3 py-2 border rounded">
             <option value="">Select offered shift (optional)</option>
-            {shifts.map((s) => (
-              <option key={s._id || s.id} value={s._id || s.id}>
+            {shifts.map((s, index) => {
+              const shiftId = getEntityId(s, `offered-shift-${index}`);
+              return (
+              <option key={shiftId} value={shiftId}>
                 {s.title || 'Shift'} - {new Date(s.startTime).toLocaleString()}
               </option>
-            ))}
+              );
+            })}
           </select>
 
           <textarea name="reason" placeholder="Reason for swap" value={form.reason} onChange={handleChange} className="mb-4 block w-full px-3 py-2 border rounded h-20"></textarea>
 
-          <button onClick={handleSubmit} className="btn btn-primary" disabled={creating}>
-            {creating ? 'Submitting...' : 'Submit Request'}
-          </button>
+          <LoadingButton onClick={handleSubmit} className="btn btn-primary" loading={creating}>
+            Submit Request
+          </LoadingButton>
         </div>
       )}
 
@@ -183,8 +232,11 @@ const Swaps = () => {
 
         {!loading && swaps.length > 0 && (
           <div className="space-y-4">
-            {swaps.map((swap) => (
-              <div key={swap._id || swap.id} className="border border-gray-200 rounded-lg p-4 dark:border-gray-700">
+            {swaps.map((swap, index) => {
+              const swapId = getEntityId(swap, `swap-${index}`);
+
+              return (
+              <div key={swapId} className="border border-gray-200 rounded-lg p-4 dark:border-gray-700">
                 <div className="flex justify-between items-start mb-3">
                   <div>
                     <h3 className="font-semibold text-gray-900 dark:text-white">
@@ -194,6 +246,20 @@ const Swaps = () => {
                   </div>
                   <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(swap.status)}`}>
                     {swap.status}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 mb-4">
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getStageClass(getStageState(swap.status, 'requested'))}`}>
+                    Requested
+                  </span>
+                  <span className="text-gray-400">→</span>
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getStageClass(getStageState(swap.status, 'peer'))}`}>
+                    Peer Response
+                  </span>
+                  <span className="text-gray-400">→</span>
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getStageClass(getStageState(swap.status, 'manager'))}`}>
+                    Manager Review
                   </span>
                 </div>
 
@@ -213,24 +279,42 @@ const Swaps = () => {
                 {/* Peer response (for requested employee) */}
                 {swap.status === 'pending' && swap.requestedWith._id === (user?.id || (user as any)?._id) && (
                   <div className="flex gap-2">
-                    <button onClick={() => handleRespond(swap.id, true)} className="btn btn-sm btn-primary">
+                    <LoadingButton
+                      onClick={() => handleRespond(swapId, true)}
+                      className="btn btn-sm btn-primary"
+                      loading={actionLoading[swapId] === 'respond-accept'}
+                    >
                       Accept
-                    </button>
-                    <button onClick={() => handleRespond(swap.id, false)} className="btn btn-sm">
+                    </LoadingButton>
+
+                    <LoadingButton
+                      onClick={() => handleRespond(swapId, false)}
+                      className="btn btn-sm"
+                      loading={actionLoading[swapId] === 'respond-reject'}
+                    >
                       Reject
-                    </button>
+                    </LoadingButton>
                   </div>
                 )}
 
                 {/* Manager review (for managers) */}
                 {swap.status === 'peer-accepted' && user?.role !== 'employee' && (
                   <div className="flex gap-2">
-                    <button onClick={() => handleApprove(swap.id, true)} className="btn btn-sm btn-primary">
+                    <LoadingButton
+                      onClick={() => handleApprove(swapId, true)}
+                      className="btn btn-sm btn-primary"
+                      loading={actionLoading[swapId] === 'approve'}
+                    >
                       Approve
-                    </button>
-                    <button onClick={() => handleApprove(swap.id, false)} className="btn btn-sm">
+                    </LoadingButton>
+
+                    <LoadingButton
+                      onClick={() => handleApprove(swapId, false)}
+                      className="btn btn-sm"
+                      loading={actionLoading[swapId] === 'reject'}
+                    >
                       Reject
-                    </button>
+                    </LoadingButton>
                   </div>
                 )}
 
@@ -246,7 +330,8 @@ const Swaps = () => {
                   </p>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

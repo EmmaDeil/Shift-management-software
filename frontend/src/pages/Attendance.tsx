@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { Attendance } from '../types';
+import LoadingButton from '../components/LoadingButton';
 
 const AttendancePage = () => {
   const navigate = useNavigate();
@@ -78,13 +79,13 @@ const AttendancePage = () => {
             <p className="text-gray-600">Click the button to clock {clockedIn ? 'out' : 'in'}</p>
           </div>
           {clockedIn ? (
-            <button onClick={handleClockOut} className="btn btn-danger" disabled={clocking}>
-              {clocking ? 'Clocking Out...' : 'Clock Out'}
-            </button>
+            <LoadingButton onClick={handleClockOut} className="btn btn-danger" loading={clocking}>
+              Clock Out
+            </LoadingButton>
           ) : (
-            <button onClick={handleClockIn} className="btn btn-primary" disabled={clocking}>
-              {clocking ? 'Clocking In...' : 'Clock In'}
-            </button>
+            <LoadingButton onClick={handleClockIn} className="btn btn-primary" loading={clocking}>
+              Clock In
+            </LoadingButton>
           )}
         </div>
       </div>

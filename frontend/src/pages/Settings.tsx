@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import LoadingButton from '../components/LoadingButton';
 
 const Settings = () => {
   const { user } = useAuth();
@@ -99,9 +100,9 @@ const Settings = () => {
         </div>
 
         <div className="flex items-center justify-end">
-          <button onClick={handleSave} className="btn btn-primary" disabled={loading}>
-            {loading ? 'Saving...' : 'Save Settings'}
-          </button>
+          <LoadingButton onClick={handleSave} className="btn btn-primary" loading={loading}>
+            Save Settings
+          </LoadingButton>
         </div>
       </div>
     </div>

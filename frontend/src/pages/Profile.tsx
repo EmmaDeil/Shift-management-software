@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import LoadingButton from '../components/LoadingButton';
 
 const Profile = () => {
   const { user } = useAuth();
@@ -123,9 +124,9 @@ const Profile = () => {
         </div>
 
         <div className="flex justify-end">
-          <button onClick={handleSave} className="btn btn-primary" disabled={saving}>
-            {saving ? 'Saving...' : 'Save Profile'}
-          </button>
+          <LoadingButton onClick={handleSave} className="btn btn-primary" loading={saving}>
+            Save Profile
+          </LoadingButton>
         </div>
       </div>
     </div>
