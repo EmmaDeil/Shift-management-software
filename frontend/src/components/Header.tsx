@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FiBell, FiCheck, FiLoader, FiLogOut, FiSettings, FiTrash2, FiUser } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
@@ -122,6 +122,22 @@ const Header = () => {
     }
   };
 
+  const navigate = useNavigate();
+
+  const handleOpenAction = (actionUrl?: string) => {
+    if (!actionUrl) return;
+    try {
+      if (actionUrl.startsWith('http')) {
+        window.open(actionUrl, '_blank');
+      } else {
+        navigate(actionUrl);
+      }
+      setShowNotifications(false);
+    } catch (err) {
+      // ignore
+    }
+  };
+
   const handleMarkAllRead = async () => {
     setMarkingAllRead(true);
     try {
@@ -181,7 +197,13 @@ const Header = () => {
                 ) : (
                   <ul className="divide-y divide-gray-100 dark:divide-gray-700">
                     {notifications.map((n) => (
-                      <li key={n.id} className={`px-4 py-3 ${!n.isRead ? 'bg-blue-50/60 dark:bg-blue-900/20' : ''}`}>
+                      <li
+                        key={n.id}
+                        onClick={() => handleOpenAction(n.actionUrl)}
+                        className={`px-4 py-3 ${!n.isRead ? 'bg-blue-50/60 dark:bg-blue-900/20' : ''}`}
+                        role="button"
+                        tabIndex={0}
+                      >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{n.title}</p>
@@ -192,7 +214,7 @@ const Header = () => {
                           <div className="flex items-center gap-1 shrink-0">
                             {!n.isRead && (
                               <button
-                                onClick={() => handleMarkAsRead(n.id)}
+                                onClick={(e) => { e.stopPropagation(); handleMarkAsRead(n.id); }}
                                 disabled={itemActionLoading[n.id] !== null}
                                 className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50"
                                 title="Mark as read"
@@ -201,7 +223,7 @@ const Header = () => {
                               </button>
                             )}
                             <button
-                              onClick={() => handleDeleteNotification(n.id)}
+                              onClick={(e) => { e.stopPropagation(); handleDeleteNotification(n.id); }}
                               disabled={itemActionLoading[n.id] !== null}
                               className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-red-600 disabled:opacity-50"
                               title="Delete notification"

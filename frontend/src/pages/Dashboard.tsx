@@ -3,6 +3,7 @@ import api from '../utils/api';
 import { useNavigate } from 'react-router-dom';
 import { Shift } from '../types';
 import { useAuth } from '../context/AuthContext';
+import LoadingButton from '../components/LoadingButton';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ const Dashboard = () => {
     upcomingShifts: [] as Shift[],
   });
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (!isManagement) {
@@ -110,9 +112,34 @@ const Dashboard = () => {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{user?.role === 'admin' ? 'Admin Dashboard' : 'Manager Dashboard'}</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">Management overview with team and operations controls.</p>
         </div>
-        <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-800 text-sm font-medium capitalize">
-          {user?.role}
-        </span>
+        <div className="flex items-center gap-3">
+          <LoadingButton className="btn" loading={exporting} onClick={async () => {
+            setExporting(true);
+            try {
+              const res = await api.get('/analytics/dashboard');
+              const data = res.data.data || res.data;
+              const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+              const url = window.URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `dashboard-stats-${Date.now()}.json`;
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              window.URL.revokeObjectURL(url);
+            } catch (err) {
+              console.error('Failed to export stats');
+            } finally {
+              setExporting(false);
+            }
+          }}>
+            Export Stats
+          </LoadingButton>
+
+          <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-800 text-sm font-medium capitalize">
+            {user?.role}
+          </span>
+        </div>
       </div>
       
       {/* KPI Cards */}

@@ -189,6 +189,7 @@ exports.createSwap = async (req, res, next) => {
       type: 'swap-requested',
       title: 'Shift Swap Request',
       message: `${req.user.firstName} ${req.user.lastName} wants to swap shifts with you`,
+      data: { swapId: swap._id },
       priority: 'high',
       actionUrl: '/swaps',
     });
@@ -259,6 +260,7 @@ exports.respondToSwap = async (req, res, next) => {
       type: accept ? 'swap-accepted' : 'swap-rejected',
       title: `Swap Request ${accept ? 'Accepted' : 'Rejected'}`,
       message: `Your swap request was ${accept ? 'accepted' : 'rejected'}`,
+      data: { swapId: swap._id },
       priority: 'medium',
       actionUrl: '/swaps',
     });
@@ -274,6 +276,7 @@ exports.respondToSwap = async (req, res, next) => {
           type: 'swap-requested',
           title: 'Swap Awaiting Approval',
           message: 'A shift swap request needs manager approval',
+          data: { swapId: swap._id },
           priority: 'medium',
           actionUrl: '/swaps',
         });
@@ -353,6 +356,7 @@ exports.reviewSwap = async (req, res, next) => {
       type: approve ? 'swap-accepted' : 'swap-rejected',
       title: `Swap ${approve ? 'Approved' : 'Rejected'}`,
       message: `Your swap request was ${approve ? 'approved' : 'rejected'} by management`,
+      data: { swapId: swap._id },
       priority: 'medium',
       actionUrl: '/swaps',
     });
@@ -362,6 +366,7 @@ exports.reviewSwap = async (req, res, next) => {
       type: approve ? 'swap-accepted' : 'swap-rejected',
       title: `Swap ${approve ? 'Approved' : 'Rejected'}`,
       message: `The swap request was ${approve ? 'approved' : 'rejected'} by management`,
+      data: { swapId: swap._id },
       priority: 'medium',
       actionUrl: '/swaps',
     });

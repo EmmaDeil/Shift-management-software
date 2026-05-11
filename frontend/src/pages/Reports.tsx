@@ -57,12 +57,33 @@ const Reports = () => {
     }
   };
 
+  const downloadCSV = async () => {
+    if (!startDate || !endDate) return toast.error('Select start and end dates');
+    setLoading(true);
+    try {
+      const res = await api.get(`/reports/${type}`, { params: { startDate, endDate, format: 'csv' }, responseType: 'blob' });
+      const blob = new Blob([res.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${type}-report-${Date.now()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to download CSV');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div>
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">Reports & Analytics</h1>
 
-      <div className="card p-6 max-w-3xl">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+      <div className="card p-6 w-full">
+        <div className="grid grid-cols-1 gap-4 mb-4 xl:grid-cols-[minmax(0,18rem)_repeat(2,minmax(0,1fr))_auto]">
           <select value={type} onChange={(e) => setType(e.target.value as ReportType)} className="col-span-1">
             <option value="attendance">Attendance</option>
             <option value="schedule">Schedule</option>
@@ -73,7 +94,7 @@ const Reports = () => {
           <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="col-span-1" />
           <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="col-span-1" />
 
-          <div className="col-span-1 flex gap-2">
+          <div className="col-span-1 flex flex-wrap gap-2 xl:justify-end">
             <LoadingButton onClick={fetchReport} className="btn btn-primary" loading={loading}>
               Fetch
             </LoadingButton>
@@ -82,6 +103,9 @@ const Reports = () => {
             </LoadingButton>
             <LoadingButton onClick={() => downloadReport('pdf')} className="btn" loading={loading}>
               Export PDF
+            </LoadingButton>
+            <LoadingButton onClick={downloadCSV} className="btn" loading={loading}>
+              Export CSV
             </LoadingButton>
           </div>
         </div>
