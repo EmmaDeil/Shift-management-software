@@ -1,6 +1,10 @@
 const User = require('../models/User');
+const Employee = require('../models/Employee');
 const Joi = require('joi');
+const mongoose = require('mongoose');
 const logger = require('../config/logger');
+
+const generateEmployeeId = () => `EMP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
 // Validation schemas
 const registerSchema = Joi.object({
@@ -50,6 +54,18 @@ exports.register = async (req, res, next) => {
       role: 'employee',
     });
 
+    // Keep auth-dependent employee flows working by creating a linked profile at registration time.
+    try {
+      await Employee.create({
+        user: user._id,
+        employeeId: generateEmployeeId(),
+        hireDate: new Date(),
+      });
+    } catch (employeeError) {
+      await User.findByIdAndDelete(user._id);
+      throw employeeError;
+    }
+
     // Generate tokens
     const token = user.generateAuthToken();
     const refreshToken = user.generateRefreshToken();
@@ -80,6 +96,13 @@ exports.register = async (req, res, next) => {
 // @access  Public
 exports.login = async (req, res, next) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({
+        status: 'error',
+        message: 'Database is unavailable. Check MongoDB connectivity and try again.',
+      });
+    }
+
     // Validate input
     const { error, value } = loginSchema.validate(req.body);
     if (error) {

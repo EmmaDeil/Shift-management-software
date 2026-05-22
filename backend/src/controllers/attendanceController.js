@@ -3,6 +3,19 @@ const Employee = require('../models/Employee');
 const Shift = require('../models/Shift');
 const logger = require('../config/logger');
 
+const generateEmployeeId = () => `EMP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+const ensureEmployeeProfile = async (user) => {
+  const existing = await Employee.findOne({ user: user.id || user._id });
+  if (existing) return existing;
+
+  return Employee.create({
+    user: user.id || user._id,
+    employeeId: generateEmployeeId(),
+    hireDate: new Date(),
+  });
+};
+
 // @desc    Get attendance records
 // @route   GET /api/v1/attendance
 // @access  Private
@@ -31,10 +44,8 @@ exports.getAttendance = async (req, res, next) => {
 
     // If employee role, only show their attendance
     if (req.user.role === 'employee') {
-      const employeeDoc = await Employee.findOne({ user: req.user.id });
-      if (employeeDoc) {
-        query.employee = employeeDoc._id;
-      }
+      const employeeDoc = await ensureEmployeeProfile(req.user);
+      query.employee = employeeDoc._id;
     }
 
     // Execute query with pagination
@@ -76,13 +87,7 @@ exports.clockIn = async (req, res, next) => {
     const { shiftId, location } = req.body;
 
     // Get employee
-    const employee = await Employee.findOne({ user: req.user.id });
-    if (!employee) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Employee profile not found',
-      });
-    }
+    const employee = await ensureEmployeeProfile(req.user);
 
     // Check if already clocked in
     const existingClockIn = await Attendance.findOne({
@@ -149,13 +154,7 @@ exports.clockOut = async (req, res, next) => {
     const { location } = req.body;
 
     // Get employee
-    const employee = await Employee.findOne({ user: req.user.id });
-    if (!employee) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Employee profile not found',
-      });
-    }
+    const employee = await ensureEmployeeProfile(req.user);
 
     // Find active clock-in
     const attendance = await Attendance.findOne({
@@ -208,13 +207,7 @@ exports.clockOut = async (req, res, next) => {
 exports.startBreak = async (req, res, next) => {
   try {
     // Get employee
-    const employee = await Employee.findOne({ user: req.user.id });
-    if (!employee) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Employee profile not found',
-      });
-    }
+    const employee = await ensureEmployeeProfile(req.user);
 
     // Find active clock-in
     const attendance = await Attendance.findOne({
@@ -261,13 +254,7 @@ exports.startBreak = async (req, res, next) => {
 exports.endBreak = async (req, res, next) => {
   try {
     // Get employee
-    const employee = await Employee.findOne({ user: req.user.id });
-    if (!employee) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Employee profile not found',
-      });
-    }
+    const employee = await ensureEmployeeProfile(req.user);
 
     // Find active clock-in
     const attendance = await Attendance.findOne({
@@ -319,13 +306,7 @@ exports.endBreak = async (req, res, next) => {
 exports.getStatus = async (req, res, next) => {
   try {
     // Get employee
-    const employee = await Employee.findOne({ user: req.user.id });
-    if (!employee) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Employee profile not found',
-      });
-    }
+    const employee = await ensureEmployeeProfile(req.user);
 
     // Find active clock-in
     const attendance = await Attendance.findOne({

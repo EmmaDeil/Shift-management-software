@@ -48,6 +48,7 @@ const Schedule = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
+  const [isShiftDetailsOpen, setIsShiftDetailsOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [creatingShift, setCreatingShift] = useState(false);
@@ -277,8 +278,13 @@ const Schedule = () => {
       return;
     }
 
-    toast.success('Shift details loaded below');
+    toast.success('Shift details opened');
     setSelectedShift(event.resource);
+    setIsShiftDetailsOpen(true);
+  };
+
+  const closeShiftDetailsModal = () => {
+    setIsShiftDetailsOpen(false);
   };
 
   const handleSelectSlot = (slotInfo: any) => {
@@ -535,14 +541,24 @@ const Schedule = () => {
         </div>
       )}
 
-      {selectedShift && (
-        <div className="card p-6 mt-4">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Selected Shift</h2>
-          <p className="text-gray-700 dark:text-gray-200"><span className="font-medium">Title:</span> {selectedShift.title || 'Shift'}</p>
-          <p className="text-gray-700 dark:text-gray-200"><span className="font-medium">Employee:</span> {selectedShift.employee?.user?.firstName} {selectedShift.employee?.user?.lastName}</p>
-          <p className="text-gray-700 dark:text-gray-200"><span className="font-medium">Start:</span> {formatDate(selectedShift.startTime as any)}</p>
-          <p className="text-gray-700 dark:text-gray-200"><span className="font-medium">End:</span> {formatDate(selectedShift.endTime as any)}</p>
-          <p className="text-gray-700 dark:text-gray-200"><span className="font-medium">Status:</span> {selectedShift.status}</p>
+      {isShiftDetailsOpen && selectedShift && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-lg w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Selected Shift</h2>
+              <button onClick={closeShiftDetailsModal} className="btn">Close</button>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-gray-700 dark:text-gray-200"><span className="font-medium">Title:</span> {selectedShift.title || 'Shift'}</p>
+              <p className="text-gray-700 dark:text-gray-200"><span className="font-medium">Employee:</span> {selectedShift.employee?.user?.firstName} {selectedShift.employee?.user?.lastName}</p>
+              <p className="text-gray-700 dark:text-gray-200"><span className="font-medium">Start:</span> {formatDate(selectedShift.startTime as any)}</p>
+              <p className="text-gray-700 dark:text-gray-200"><span className="font-medium">End:</span> {formatDate(selectedShift.endTime as any)}</p>
+              <p className="text-gray-700 dark:text-gray-200"><span className="font-medium">Status:</span> {selectedShift.status}</p>
+              <p className="text-gray-700 dark:text-gray-200"><span className="font-medium">Location:</span> {selectedShift.location || '—'}</p>
+              <p className="text-gray-700 dark:text-gray-200"><span className="font-medium">Notes:</span> {selectedShift.notes || '—'}</p>
+            </div>
+          </div>
         </div>
       )}
 
