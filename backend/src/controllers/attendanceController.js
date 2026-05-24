@@ -157,21 +157,45 @@ exports.clockIn = async (req, res, next) => {
       }
     }
 
-    // Ensure we have a shift: try to locate an active shift if none was provided
+    // Ensure we have a shift: try to locate an active or scheduled shift if none was provided
     const now = new Date();
     if (!shift && !shiftId) {
-      // Try to find an active shift for the employee at this time
+      const startOfDay = new Date(now);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(now);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      // 1) Active shift right now
       shift = await Shift.findOne({
         employee: employee._id,
         startTime: { $lte: now },
         endTime: { $gte: now },
-      });
+        status: { $ne: 'cancelled' },
+      }).sort({ startTime: 1 });
+
+      // 2) Any scheduled shift today
+      if (!shift) {
+        shift = await Shift.findOne({
+          employee: employee._id,
+          startTime: { $gte: startOfDay, $lte: endOfDay },
+          status: { $ne: 'cancelled' },
+        }).sort({ startTime: 1 });
+      }
+
+      // 3) Next upcoming scheduled shift
+      if (!shift) {
+        shift = await Shift.findOne({
+          employee: employee._id,
+          startTime: { $gte: now },
+          status: { $ne: 'cancelled' },
+        }).sort({ startTime: 1 });
+      }
     }
 
     if (!shift) {
       return res.status(400).json({
         status: 'error',
-        message: 'No shift specified and no active shift was found. Provide `shiftId` or ensure a shift is assigned for now.',
+        message: 'No shift specified and no assigned shift was found for today. Provide `shiftId` or assign a shift before clocking in.',
       });
     }
 
