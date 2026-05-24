@@ -1,6 +1,7 @@
 const Attendance = require('../models/Attendance');
 const Employee = require('../models/Employee');
 const Shift = require('../models/Shift');
+const User = require('../models/User');
 const logger = require('../config/logger');
 
 const generateEmployeeId = () => `EMP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -14,6 +15,21 @@ const ensureEmployeeProfile = async (user) => {
     employeeId: generateEmployeeId(),
     hireDate: new Date(),
   });
+};
+
+const getAttendanceRooms = async (employee) => {
+  const rooms = new Set();
+  rooms.add(`user-${employee.user}`);
+
+  const user = await User.findById(employee.user).select('department role');
+  if (user?.department) {
+    rooms.add(`department-${user.department}`);
+  }
+  if (user?.role) {
+    rooms.add(`role-${user.role}`);
+  }
+
+  return Array.from(rooms);
 };
 
 // @desc    Get attendance records
@@ -37,9 +53,9 @@ exports.getAttendance = async (req, res, next) => {
     if (status) query.status = status;
     
     if (startDate || endDate) {
-      query.clockIn = {};
-      if (startDate) query.clockIn.$gte = new Date(startDate);
-      if (endDate) query.clockIn.$lte = new Date(endDate);
+      query['clockIn.time'] = {};
+      if (startDate) query['clockIn.time'].$gte = new Date(startDate);
+      if (endDate) query['clockIn.time'].$lte = new Date(endDate);
     }
 
     // If employee role, only show their attendance
@@ -58,7 +74,7 @@ exports.getAttendance = async (req, res, next) => {
       .populate('shift', 'startTime endTime position location')
       .skip(skip)
       .limit(parseInt(limit))
-      .sort('-clockIn');
+      .sort('-clockIn.time');
 
     const total = await Attendance.countDocuments(query);
 
@@ -79,6 +95,29 @@ exports.getAttendance = async (req, res, next) => {
   }
 };
 
+// @desc    Get active attendance snapshot
+// @route   GET /api/v1/attendance/active
+// @access  Private
+exports.getActiveAttendance = async (req, res, next) => {
+  try {
+    const activeAttendance = await Attendance.find({
+      'clockOut.time': { $exists: false },
+    })
+      .populate({
+        path: 'employee',
+        populate: { path: 'user', select: 'firstName lastName email department role avatar position' },
+      })
+      .populate('shift', 'startTime endTime position location');
+
+    res.json({
+      status: 'success',
+      data: { activeAttendance },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Clock in
 // @route   POST /api/v1/attendance/clock-in
 // @access  Private
@@ -89,10 +128,10 @@ exports.clockIn = async (req, res, next) => {
     // Get employee
     const employee = await ensureEmployeeProfile(req.user);
 
-    // Check if already clocked in
+    // Check if already clocked in (no clockOut.time exists)
     const existingClockIn = await Attendance.findOne({
       employee: employee._id,
-      clockOut: null,
+      'clockOut.time': { $exists: false },
     });
 
     if (existingClockIn) {
@@ -118,12 +157,43 @@ exports.clockIn = async (req, res, next) => {
       }
     }
 
+    // Ensure we have a shift: try to locate an active shift if none was provided
+    const now = new Date();
+    if (!shift && !shiftId) {
+      // Try to find an active shift for the employee at this time
+      shift = await Shift.findOne({
+        employee: employee._id,
+        startTime: { $lte: now },
+        endTime: { $gte: now },
+      });
+    }
+
+    if (!shift) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'No shift specified and no active shift was found. Provide `shiftId` or ensure a shift is assigned for now.',
+      });
+    }
+
+    // Build clockIn object matching the schema
+    const clockInObj = {
+      time: new Date(),
+      ip: req.ip || req.headers['x-forwarded-for'] || '',
+      device: req.headers['user-agent'] || '',
+    };
+
+    if (location && typeof location === 'object' && location.longitude != null && location.latitude != null) {
+      clockInObj.location = {
+        type: 'Point',
+        coordinates: [location.longitude, location.latitude],
+      };
+    }
+
     // Create attendance record
     const attendance = await Attendance.create({
       employee: employee._id,
-      shift: shiftId || undefined,
-      clockIn: new Date(),
-      clockInLocation: location,
+      shift: shift._id,
+      clockIn: clockInObj,
       status: 'present',
     });
 
@@ -136,6 +206,26 @@ exports.clockIn = async (req, res, next) => {
     ]);
 
     logger.info(`Employee clocked in: ${employee.employeeId}`);
+    
+    // Emit socket.io event for presence
+    try {
+      const io = req.app.get('io');
+      const payload = {
+        attendanceId: attendance._id,
+        employeeId: attendance.employee,
+        userId: employee.user,
+        isClockedIn: true,
+        timestamp: attendance.clockIn.time,
+        shiftId: attendance.shift,
+      };
+      if (io) {
+        const rooms = await getAttendanceRooms(employee);
+        rooms.forEach((room) => io.to(room).emit('attendance:clock-in', payload));
+        rooms.forEach((room) => io.to(room).emit('attendance:updated', payload));
+      }
+    } catch (emitErr) {
+      logger.error(`Failed to emit socket event on clock-in: ${emitErr.message}`);
+    }
 
     res.status(201).json({
       status: 'success',
@@ -159,7 +249,7 @@ exports.clockOut = async (req, res, next) => {
     // Find active clock-in
     const attendance = await Attendance.findOne({
       employee: employee._id,
-      clockOut: null,
+      'clockOut.time': { $exists: false },
     });
 
     if (!attendance) {
@@ -177,9 +267,20 @@ exports.clockOut = async (req, res, next) => {
       }
     }
 
-    // Clock out
-    attendance.clockOut = new Date();
-    attendance.clockOutLocation = location;
+    // Clock out - set nested object to match schema
+    const clockOutObj = {
+      time: new Date(),
+      ip: req.ip || req.headers['x-forwarded-for'] || '',
+      device: req.headers['user-agent'] || '',
+    };
+    if (location && typeof location === 'object' && location.longitude != null && location.latitude != null) {
+      clockOutObj.location = {
+        type: 'Point',
+        coordinates: [location.longitude, location.latitude],
+      };
+    }
+
+    attendance.clockOut = clockOutObj;
     await attendance.save();
 
     await attendance.populate([
@@ -191,6 +292,26 @@ exports.clockOut = async (req, res, next) => {
     ]);
 
     logger.info(`Employee clocked out: ${employee.employeeId}, Hours: ${attendance.totalHours}`);
+
+    // Emit socket.io event for presence update
+    try {
+      const io = req.app.get('io');
+      const payload = {
+        attendanceId: attendance._id,
+        employeeId: attendance.employee,
+        userId: employee.user,
+        isClockedIn: false,
+        timestamp: attendance.clockOut.time,
+        shiftId: attendance.shift,
+      };
+      if (io) {
+        const rooms = await getAttendanceRooms(employee);
+        rooms.forEach((room) => io.to(room).emit('attendance:clock-out', payload));
+        rooms.forEach((room) => io.to(room).emit('attendance:updated', payload));
+      }
+    } catch (emitErr) {
+      logger.error(`Failed to emit socket event on clock-out: ${emitErr.message}`);
+    }
 
     res.json({
       status: 'success',
@@ -212,7 +333,7 @@ exports.startBreak = async (req, res, next) => {
     // Find active clock-in
     const attendance = await Attendance.findOne({
       employee: employee._id,
-      clockOut: null,
+      'clockOut.time': { $exists: false },
     });
 
     if (!attendance) {
@@ -259,7 +380,7 @@ exports.endBreak = async (req, res, next) => {
     // Find active clock-in
     const attendance = await Attendance.findOne({
       employee: employee._id,
-      clockOut: null,
+      'clockOut.time': { $exists: false },
     });
 
     if (!attendance) {

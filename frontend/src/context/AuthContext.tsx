@@ -3,6 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../utils/api';
 import { User, AuthContextType } from '../types';
+import socketUtil from '../utils/socket';
+
+const joinAttendanceRooms = (token: string, user: User) => {
+  const socket = socketUtil.initSocket(token);
+  if (!socket || !user?.id) return;
+
+  socket.emit('join-room', user.id);
+
+  if (user.department) {
+    socket.emit('join-room', `department-${user.department}`);
+  }
+
+  if (user.role) {
+    socket.emit('join-room', `role-${user.role}`);
+  }
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -27,7 +43,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     if (storedToken && storedUser) {
       setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+      const parsedUser = JSON.parse(storedUser);
+      setUser(parsedUser);
+      try {
+        joinAttendanceRooms(storedToken, parsedUser);
+      } catch (e) {
+        // ignore socket init errors
+      }
     }
     setIsLoading(false);
   }, []);
@@ -42,6 +64,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       setToken(token);
       setUser(user);
+
+      // initialize socket and join attendance rooms
+      try {
+        joinAttendanceRooms(token, user);
+      } catch (e) {
+        // ignore
+      }
 
       toast.success('Login successful!');
       navigate('/dashboard');
@@ -70,6 +99,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setToken(token);
       setUser(user);
 
+      // initialize socket and join attendance rooms
+      try {
+        joinAttendanceRooms(token, user);
+      } catch (e) {
+        // ignore
+      }
+
       toast.success('Account created successfully!');
       navigate('/dashboard');
     } catch (error: any) {
@@ -83,6 +119,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem('user');
     setToken(null);
     setUser(null);
+    try {
+      socketUtil.disconnectSocket();
+    } catch (e) {}
     toast.success('Logged out successfully');
     navigate('/login');
   };

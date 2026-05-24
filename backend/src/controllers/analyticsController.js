@@ -26,8 +26,8 @@ exports.getDashboardAnalytics = async (req, res, next) => {
 
     // Currently clocked in
     const currentlyClockedIn = await Attendance.countDocuments({
-      clockIn: { $gte: today },
-      clockOut: null,
+      'clockIn.time': { $gte: today },
+      'clockOut.time': { $exists: false },
     });
 
     // Pending leaves
@@ -43,7 +43,7 @@ exports.getDashboardAnalytics = async (req, res, next) => {
     });
 
     const weekAttendance = await Attendance.countDocuments({
-      clockIn: { $gte: weekStart },
+      'clockIn.time': { $gte: weekStart },
     });
 
     // Upcoming shifts (next 7 days)
@@ -91,13 +91,13 @@ exports.getAttendanceTrends = async (req, res, next) => {
     const attendance = await Attendance.aggregate([
       {
         $match: {
-          clockIn: { $gte: startDate },
+          'clockIn.time': { $gte: startDate },
         },
       },
       {
         $group: {
           _id: {
-            $dateToString: { format: '%Y-%m-%d', date: '$clockIn' },
+            $dateToString: { format: '%Y-%m-%d', date: '$clockIn.time' },
           },
           total: { $sum: 1 },
           present: {
@@ -135,7 +135,7 @@ exports.getLaborCost = async (req, res, next) => {
     const end = endDate ? new Date(endDate) : new Date();
 
     const attendance = await Attendance.find({
-      clockIn: { $gte: start, $lte: end },
+      'clockIn.time': { $gte: start, $lte: end },
     })
       .populate({
         path: 'employee',
@@ -157,7 +157,7 @@ exports.getLaborCost = async (req, res, next) => {
     const costByDepartment = await Attendance.aggregate([
       {
         $match: {
-          clockIn: { $gte: start, $lte: end },
+          'clockIn.time': { $gte: start, $lte: end },
         },
       },
       {
@@ -212,7 +212,7 @@ exports.getEmployeePerformance = async (req, res, next) => {
     const end = endDate ? new Date(endDate) : new Date();
 
     const query = {
-      clockIn: { $gte: start, $lte: end },
+      'clockIn.time': { $gte: start, $lte: end },
     };
 
     if (employeeId) {

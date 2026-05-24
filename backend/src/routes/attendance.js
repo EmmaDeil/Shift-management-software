@@ -8,12 +8,14 @@ const {
   startBreak,
   endBreak,
   getStatus,
+  getActiveAttendance,
   updateAttendance,
 } = require('../controllers/attendanceController');
 
 router.use(protect);
 
 router.get('/', getAttendance);
+router.get('/active', getActiveAttendance);
 router.get('/status', getStatus);
 router.post('/clock-in', clockIn);
 router.post('/clock-out', clockOut);

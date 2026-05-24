@@ -4,32 +4,89 @@ import api from '../utils/api';
 import LoadingButton from '../components/LoadingButton';
 import toast from 'react-hot-toast';
 import { Employee } from '../types';
+import socketUtil from '../utils/socket';
 
 const Employees = () => {
   const navigate = useNavigate();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeMap, setActiveMap] = useState<Record<string, boolean>>({});
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [inviteLoading, setInviteLoading] = useState(false);
   const [invite, setInvite] = useState({ email: '', firstName: '', lastName: '', role: 'employee' });
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchEmployees = async () => {
       setLoading(true);
       try {
         const res = await api.get('/employees');
         // API returns { data: [...] } or { data: { data: [...] } } depending on backend
         const payload = res.data.data || res.data;
-        setEmployees(Array.isArray(payload) ? payload : payload.data || []);
+        if (isMounted) {
+          setEmployees(Array.isArray(payload) ? payload : payload.data || []);
+        }
       } catch (err: any) {
-        setError(err.response?.data?.message || 'Failed to load employees');
+        if (isMounted) {
+          setError(err.response?.data?.message || 'Failed to load employees');
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
+    let s: any = null;
     fetchEmployees();
+    try {
+      s = socketUtil.getSocket() || socketUtil.initSocket();
+      if (s) {
+        s.on('attendance:clock-in', (payload: any) => {
+          setActiveMap((m) => ({ ...m, [String(payload.employeeId)]: true }));
+        });
+        s.on('attendance:clock-out', (payload: any) => {
+          setActiveMap((m) => ({ ...m, [String(payload.employeeId)]: false }));
+        });
+        s.on('attendance:updated', (payload: any) => {
+          if (typeof payload.isClockedIn === 'boolean') {
+            setActiveMap((m) => ({ ...m, [String(payload.employeeId)]: payload.isClockedIn }));
+          }
+        });
+      }
+    } catch (e) {
+      // ignore socket init errors
+    }
+
+    const loadInitialActiveEmployees = async () => {
+      try {
+        const response = await api.get('/attendance/active');
+        const activeAttendance = response.data?.data?.activeAttendance || [];
+        if (!isMounted) return;
+
+        const nextMap: Record<string, boolean> = {};
+        activeAttendance.forEach((record: any) => {
+          const employeeId = record.employee?.id || record.employee?._id || record.employee;
+          if (employeeId) nextMap[String(employeeId)] = true;
+        });
+        setActiveMap(nextMap);
+      } catch (error) {
+        // fall back to live socket updates only
+      }
+    };
+
+    loadInitialActiveEmployees();
+
+    return () => {
+      isMounted = false;
+      if (s) {
+        s.off && s.off('attendance:clock-in');
+        s.off && s.off('attendance:clock-out');
+        s.off && s.off('attendance:updated');
+      }
+    };
   }, []);
 
   return (
@@ -104,7 +161,10 @@ const Employees = () => {
                 {employees.map((emp) => (
                   <tr key={emp.id}>
                     <td className="px-4 py-3">
-                      {emp.user?.firstName} {emp.user?.lastName}
+                      <div className="flex items-center gap-2">
+                        <span className={`h-3 w-3 rounded-full ${activeMap[emp.id] ? 'bg-green-500' : 'bg-gray-300'}`} />
+                        <span>{emp.user?.firstName} {emp.user?.lastName}</span>
+                      </div>
                     </td>
                     <td className="px-4 py-3">{emp.user?.email}</td>
                     <td className="px-4 py-3">{emp.user?.position || '—'}</td>

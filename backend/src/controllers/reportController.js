@@ -20,12 +20,12 @@ exports.getAttendanceReport = async (req, res, next) => {
       });
     }
 
-    const query = {
-      clockIn: {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate),
-      },
-    };
+      const query = {
+        'clockIn.time': {
+          $gte: new Date(startDate),
+          $lte: new Date(endDate),
+        },
+      };
 
     if (employeeId) {
       query.employee = employeeId;
@@ -37,7 +37,7 @@ exports.getAttendanceReport = async (req, res, next) => {
         populate: { path: 'user', select: 'firstName lastName email department' },
       })
       .populate('shift', 'startTime endTime position')
-      .sort('clockIn');
+        .sort('clockIn.time');
 
     if (format === 'json') {
       return res.json({
@@ -63,16 +63,16 @@ exports.getAttendanceReport = async (req, res, next) => {
       ];
 
       attendance.forEach(record => {
-        worksheet.addRow({
-          date: record.clockIn.toLocaleDateString(),
-          employeeId: record.employee?.employeeId || 'N/A',
-          name: `${record.employee?.user?.firstName} ${record.employee?.user?.lastName}`,
-          department: record.employee?.user?.department || 'N/A',
-          clockIn: record.clockIn.toLocaleString(),
-          clockOut: record.clockOut ? record.clockOut.toLocaleString() : 'Still clocked in',
-          totalHours: record.totalHours?.toFixed(2) || '0',
-          status: record.status,
-        });
+          worksheet.addRow({
+            date: record.clockIn?.time ? record.clockIn.time.toLocaleDateString() : 'N/A',
+            employeeId: record.employee?.employeeId || 'N/A',
+            name: `${record.employee?.user?.firstName} ${record.employee?.user?.lastName}`,
+            department: record.employee?.user?.department || 'N/A',
+            clockIn: record.clockIn?.time ? record.clockIn.time.toLocaleString() : 'N/A',
+            clockOut: record.clockOut?.time ? record.clockOut.time.toLocaleString() : 'Still clocked in',
+            totalHours: record.totalHours?.toFixed(2) || '0',
+            status: record.status,
+          });
       });
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -99,14 +99,14 @@ exports.getAttendanceReport = async (req, res, next) => {
       // Table
       attendance.forEach(record => {
         doc.fontSize(10)
-          .text(`Employee: ${record.employee?.user?.firstName} ${record.employee?.user?.lastName} (${record.employee?.employeeId})`)
-          .text(`Department: ${record.employee?.user?.department}`)
-          .text(`Date: ${record.clockIn.toLocaleDateString()}`)
-          .text(`Clock In: ${record.clockIn.toLocaleString()}`)
-          .text(`Clock Out: ${record.clockOut ? record.clockOut.toLocaleString() : 'Still clocked in'}`)
-          .text(`Total Hours: ${record.totalHours?.toFixed(2) || '0'}`)
-          .text(`Status: ${record.status}`)
-          .moveDown();
+            .text(`Employee: ${record.employee?.user?.firstName} ${record.employee?.user?.lastName} (${record.employee?.employeeId})`)
+            .text(`Department: ${record.employee?.user?.department}`)
+            .text(`Date: ${record.clockIn?.time ? record.clockIn.time.toLocaleDateString() : 'N/A'}`)
+            .text(`Clock In: ${record.clockIn?.time ? record.clockIn.time.toLocaleString() : 'N/A'}`)
+            .text(`Clock Out: ${record.clockOut?.time ? record.clockOut.time.toLocaleString() : 'Still clocked in'}`)
+            .text(`Total Hours: ${record.totalHours?.toFixed(2) || '0'}`)
+            .text(`Status: ${record.status}`)
+            .moveDown();
       });
 
       doc.end();

@@ -80,8 +80,12 @@ io.on('connection', (socket) => {
   logger.info(`Socket connected: ${socket.id}`);
 
   socket.on('join-room', (userId) => {
-    socket.join(`user-${userId}`);
-    logger.info(`User ${userId} joined their room`);
+    const roomName = typeof userId === 'string' && (userId.startsWith('user-') || userId.startsWith('department-') || userId.startsWith('role-'))
+      ? userId
+      : `user-${userId}`;
+
+    socket.join(roomName);
+    logger.info(`Socket ${socket.id} joined room ${roomName}`);
   });
 
   socket.on('disconnect', () => {
