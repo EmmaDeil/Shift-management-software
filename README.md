@@ -12,6 +12,8 @@ The backend is an Express + MongoDB API and the frontend is a React + TypeScript
 
 This makes the app useful anywhere a team works in shifts, such as retail, hospitality, healthcare, logistics, support centers, and office operations with scheduled coverage.
 
+No sample or demo records are bundled with the repository.
+
 ## How it works
 
 The app is split into three layers:
@@ -94,6 +96,20 @@ The core entities are:
 - `Leave`: leave type, date range, approval state, and review notes
 - `Swap`: request, peer response, manager review, and completion state
 - `Notification`: message delivery and read state
+
+## Data relationships and persistence
+
+MongoDB is the persistent source of truth for the application. The backend uses Mongoose relationships to connect the collections, and the controllers populate those links when reading data for the UI.
+
+- `User` is the parent identity record for login, role, and preferences.
+- `Employee` links back to `User` with a required `user` reference.
+- `Shift` links to `Employee` and also records `createdBy` and `updatedBy` users.
+- `Attendance` links to both `Employee` and `Shift` so the app can show who worked which shift.
+- `Leave` links to `Employee` and approval users.
+- `Swap` links the requester employee, the other employee, and the related shifts.
+- `Notification` links to a `User` recipient so the header and socket-driven updates can stay user-specific.
+
+That structure keeps the data consistent across the schedule, attendance, leave, swap, and reporting screens instead of storing isolated records with no cross-links.
 
 ## How it is used
 
@@ -185,7 +201,6 @@ npm run dev
 - `npm run dev` starts the API with nodemon and `.env.development`
 - `npm run test` runs Jest
 - `npm run lint` lints the backend source
-- `npm run seed` seeds the database with example users, employees, shifts, leaves, attendance, swaps, and notifications
 
 ### Frontend
 
@@ -193,18 +208,6 @@ npm run dev
 - `npm run build` type-checks and builds for production
 - `npm run lint` runs ESLint
 - `npm run preview` serves the built app locally
-
-## Seeded demo accounts
-
-The seed data creates these example users:
-
-- `admin@shiftflow.com`
-- `manager@shiftflow.com`
-- `employee1@shiftflow.com`
-- `employee2@shiftflow.com`
-- `employee3@shiftflow.com`
-
-The seeded password is `password`.
 
 ## Project structure
 
@@ -233,4 +236,4 @@ Shift-management-software/
 
 ## Notes
 
-This README now matches the code in the repository instead of the earlier template content.
+This README now matches the code in the repository instead of the earlier template content. No fixture data is bundled in the repository.

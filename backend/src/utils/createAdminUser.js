@@ -5,10 +5,10 @@ const User = require('../models/User');
 const Employee = require('../models/Employee');
 const logger = require('../config/logger');
 
-const TARGET_EMAIL = 'emmanueldavid376@yahoo.com';
-const TARGET_FIRST_NAME = 'Emmanuel';
-const TARGET_LAST_NAME = 'David';
-const TARGET_PASSWORD = 'Become1122';
+const TARGET_EMAIL = process.env.ADMIN_EMAIL;
+const TARGET_FIRST_NAME = process.env.ADMIN_FIRST_NAME;
+const TARGET_LAST_NAME = process.env.ADMIN_LAST_NAME;
+const TARGET_PASSWORD = process.env.ADMIN_PASSWORD;
 
 const generateEmployeeId = () => `ADM-${Date.now()}`;
 
@@ -25,6 +25,10 @@ const connect = async () => {
 };
 
 const upsertAdmin = async () => {
+  if (!TARGET_EMAIL || !TARGET_FIRST_NAME || !TARGET_LAST_NAME || !TARGET_PASSWORD) {
+    throw new Error('ADMIN_EMAIL, ADMIN_FIRST_NAME, ADMIN_LAST_NAME, and ADMIN_PASSWORD are required');
+  }
+
   await connect();
 
   let user = await User.findOne({ email: TARGET_EMAIL });

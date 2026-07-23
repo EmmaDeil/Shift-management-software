@@ -94,15 +94,7 @@ io.on('connection', (socket) => {
 });
 
 // Connect to database
-connectDB().then(async () => {
-  // Seed database with initial data
-  const seedDatabase = require('./utils/seed');
-  try {
-    await seedDatabase();
-  } catch (error) {
-    logger.error(`Failed to seed database: ${error.message}`);
-  }
-});
+connectDB();
 connectRedis();
 
 // Middleware

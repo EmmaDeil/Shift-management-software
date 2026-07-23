@@ -5,6 +5,34 @@ import api from '../utils/api';
 import { User, AuthContextType } from '../types';
 import socketUtil from '../utils/socket';
 
+const AUTH_STORAGE_KEY = 'rememberMe';
+
+const getStorage = () => {
+  const rememberMe = localStorage.getItem(AUTH_STORAGE_KEY) === 'true';
+  return rememberMe ? localStorage : sessionStorage;
+};
+
+const saveAuthState = (token: string, user: User, rememberMe: boolean) => {
+  const storage = rememberMe ? localStorage : sessionStorage;
+
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  sessionStorage.removeItem('token');
+  sessionStorage.removeItem('user');
+
+  storage.setItem('token', token);
+  storage.setItem('user', JSON.stringify(user));
+  localStorage.setItem(AUTH_STORAGE_KEY, String(rememberMe));
+};
+
+const clearAuthState = () => {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  sessionStorage.removeItem('token');
+  sessionStorage.removeItem('user');
+  localStorage.removeItem(AUTH_STORAGE_KEY);
+};
+
 const joinAttendanceRooms = (token: string, user: User) => {
   const socket = socketUtil.initSocket(token);
   if (!socket || !user?.id) return;
@@ -38,8 +66,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     // Check if user is logged in
-    const storedToken = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
+    const storage = getStorage();
+    const storedToken = storage.getItem('token');
+    const storedUser = storage.getItem('user');
 
     if (storedToken && storedUser) {
       setToken(storedToken);
@@ -54,13 +83,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(false);
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, rememberMe = false) => {
     try {
       const response = await api.post('/auth/login', { email, password });
       const { token, user } = response.data.data;
 
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
+      saveAuthState(token, user, rememberMe);
 
       setToken(token);
       setUser(user);
@@ -88,13 +116,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     phone?: string;
     department?: string;
     position?: string;
+    rememberMe?: boolean;
   }) => {
     try {
       const response = await api.post('/auth/register', data);
       const { token, user } = response.data.data;
 
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
+      saveAuthState(token, user, data.rememberMe ?? true);
 
       setToken(token);
       setUser(user);
@@ -115,8 +143,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    clearAuthState();
     setToken(null);
     setUser(null);
     try {

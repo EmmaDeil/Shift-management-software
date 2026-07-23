@@ -4,15 +4,13 @@
   "description": "ShiftFlow Enterprise Shift Management System - Backend",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
+    "start": "node -r dotenv/config src/server.js dotenv_config_path=.env.development",
     "start:dev": "node -r dotenv/config src/server.js dotenv_config_path=.env.development",
     "start:prod": "node -r dotenv/config src/server.js dotenv_config_path=.env.production",
     "dev": "nodemon -r dotenv/config src/server.js dotenv_config_path=.env.development",
     "dev:prod": "nodemon -r dotenv/config src/server.js dotenv_config_path=.env.production",
     "test": "NODE_ENV=test jest --coverage",
-    "lint": "eslint src/**/*.js",
-    "seed": "node -r dotenv/config src/utils/seed.js dotenv_config_path=.env.development",
-    "seed:prod": "node -r dotenv/config src/utils/seed.js dotenv_config_path=.env.production"
+    "lint": "eslint src/**/*.js"
   },
   "keywords": [
     "shift-management",
